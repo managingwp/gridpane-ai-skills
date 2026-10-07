@@ -1,0 +1,19 @@
+# Trigger evaluation for gridpane-security.
+# Prompts that should select this skill, and prompts that should not
+# (including generic non-GridPane security questions). See AGENTS.md / PLAN.md.
+
+should_trigger:
+  - "enable the 7g waf on example.com on gridpane"
+  - "the 7g waf is blocking a plugin, how do I whitelist it"
+  - "check fail2ban jails on our gridpane server"
+  - "unban an IP from fail2ban on gridpane"
+  - "fail2ban keeps banning cloudflare ips on gridpane"
+  - "restore real visitor IPs behind cloudflare on gridpane"
+  - "our gridpane site looks hacked, first steps"
+
+should_not_trigger:
+  - "how do I secure a brand new ubuntu server"
+  - "explain how xss works in general"
+  - "write a python exploit for a wordpress plugin"
+  - "clear the cache for example.com"
+  - "the site returns 502, find out why"

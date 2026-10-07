@@ -1,0 +1,15 @@
+# Trigger evaluation for gridpane-api.
+# Prompts that should select this skill, and prompts that should not.
+
+should_trigger:
+  - "list every site in our gridpane account with its php version"
+  - "which gridpane sites run php 8.1"
+  - "export a gridpane inventory of servers and sites to csv"
+  - "use the gridpane api to update a site backup schedule"
+  - "how do I authenticate to the gridpane rest api"
+
+should_not_trigger:
+  - "check load and memory on our gridpane server over ssh"
+  - "the site returns 502, find out why"
+  - "switch example.com to php 8.2 on the server"
+  - "how do I call the twitter api from python"

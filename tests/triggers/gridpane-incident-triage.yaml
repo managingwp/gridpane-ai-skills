@@ -1,0 +1,18 @@
+# Trigger evaluation for gridpane-incident-triage.
+# Prompts that should select this skill, and prompts that should not
+# (they belong to a sibling skill). See AGENTS.md and PLAN.md Phase 6.
+
+should_trigger:
+  - "example.com on gridpane is giving 502 bad gateway"
+  - "a gridpane site is down and timing out"
+  - "our gridpane server just sent a high load alert"
+  - "disk is full on the gridpane server"
+  - "the site is stuck in a redirect loop behind cloudflare"
+  - "wordpress shows a white screen on gridpane"
+  - "the ssl certificate failed to renew on gridpane"
+
+should_not_trigger:
+  - "tune php-fpm max_children for better performance across the server"
+  - "add a custom nginx rule to block wp-login on example.com"
+  - "how do I set up nginx on a fresh ubuntu box"
+  - "list every site in our gridpane account with its php version"

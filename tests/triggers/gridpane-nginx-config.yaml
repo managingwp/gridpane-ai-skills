@@ -1,0 +1,15 @@
+# Trigger evaluation for gridpane-nginx-config.
+# Prompts that should select this skill, and prompts that should not.
+
+should_trigger:
+  - "add a custom nginx rule to block xmlrpc.php on example.com"
+  - "rate limit wp-login.php on our gridpane site"
+  - "how do I add a custom response header in nginx on gridpane"
+  - "where do I put custom nginx config so gridpane doesn't overwrite it"
+  - "redirect one path on example.com with nginx"
+
+should_not_trigger:
+  - "the server is out of disk space, find out why"
+  - "clear the cache for example.com"
+  - "set up nginx on a fresh ubuntu box"
+  - "how do I tune php-fpm max_children"

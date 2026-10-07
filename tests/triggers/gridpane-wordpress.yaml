@@ -1,0 +1,17 @@
+# Trigger evaluation for gridpane-wordpress.
+# Prompts that should select this skill, and prompts that should not.
+
+should_trigger:
+  - "clear all caches for example.com and check redis is actually being used"
+  - "run wp-cli on a gridpane site as the correct user"
+  - "why is caching not working on my woocommerce site on gridpane"
+  - "how does gp-cron work on gridpane"
+  - "push staging to live on gridpane"
+  - "enable wp_debug safely on example.com"
+  - "search replace the domain when migrating a gridpane site"
+
+should_not_trigger:
+  - "set up a fresh wordpress on a new ubuntu box"
+  - "the server is out of disk space, find out why"
+  - "add a custom nginx rule to block xmlrpc.php"
+  - "list every site in our gridpane account with its php version"

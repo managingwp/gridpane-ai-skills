@@ -1,0 +1,15 @@
+# Trigger evaluation for gridpane-gp-cli.
+# Prompts that should select this skill, and prompts that should not.
+
+should_trigger:
+  - "what is the gp command to switch a site to php 8.2"
+  - "how do I use gp cli to disable xmlrpc on example.com"
+  - "explain the gp site suspend command"
+  - "run the gp command to enable 7g on example.com"
+  - "what gp flags affect every site on the server"
+
+should_not_trigger:
+  - "clear all caches for example.com and check redis is being used"
+  - "our gridpane server is at 100% disk, find out why"
+  - "list every site in our gridpane account with its php version"
+  - "how do I write a systemd service on ubuntu"

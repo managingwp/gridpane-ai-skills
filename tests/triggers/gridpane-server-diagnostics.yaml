@@ -1,0 +1,18 @@
+# Trigger evaluation for gridpane-server-diagnostics.
+# Prompts that should select this skill, and prompts that should not
+# (they belong to a sibling skill). See AGENTS.md and PLAN.md Phase 6.
+
+should_trigger:
+  - "which PHP-FPM pools on this gridpane server are hitting max_children"
+  - "is the database the bottleneck on my gridpane box"
+  - "what is eating disk on the gridpane server"
+  - "check load memory and swap on the gridpane server"
+  - "show me the mysql processlist on our gridpane server"
+  - "how much redis memory is our gridpane server using"
+  - "give me a health snapshot of the gridpane server"
+
+should_not_trigger:
+  - "example.com is down and returning 502 right now"
+  - "add a custom nginx rule to block xmlrpc on example.com"
+  - "list every site in our gridpane account with its php version"
+  - "set up a fresh nginx server on a new ubuntu box"

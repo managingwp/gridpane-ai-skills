@@ -1,0 +1,19 @@
+# .gitignore
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Backups created before editing config files (see safety model)
+*.bak-*
+*.orig
+
+# Generated output
+out/
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
