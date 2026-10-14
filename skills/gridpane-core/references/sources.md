@@ -62,6 +62,32 @@ a real GridPane server (2026-10-09) is the source for the server-state files in
 | Remote Website Backups | https://gridpane.com/kb/remote-website-backups/ | gp-cli |
 | How to Add Additional System Users to a Website | https://gridpane.com/kb/how-to-add-additional-system-users-to-a-website/ | wordpress |
 
+## Tooling (`gridpane-tooling`)
+
+The primary source is a maintainer-supplied snapshot of the scripts GridPane
+deploys to `/usr/local/bin` (plus `/etc/monit`), kept locally at `tmp/gpcli`
+(gitignored) and mirrored by the maintainer's `gpcli` repo. Facts cite `file:line`
+in that snapshot; the scripts are GridPane's copyright and are not rehosted
+here.
+
+| Snapshot file | Used for |
+|---|---|
+| `tmp/gpcli/README.md` | Deployed layout, `gp` CLI areas, wrappers, `lib/` modules, `gridpane.ver` |
+| `tmp/gpcli/AGENTS.md` | Snapshot conventions, `sync.sh` mirroring |
+| `tmp/gpcli/usr/local/bin/gp` | Dispatcher, sourcing, dispatch labels, unknown-command exit `187` |
+| `tmp/gpcli/usr/local/bin/gpupdate` | Update model, `/run/gridpane` lock |
+| `tmp/gpcli/usr/local/bin/lib/*.sh` | Path references (`/opt/gridpane`, `/root/gridcreds`, `/var/log`, `/etc/cron.d`, `/etc/logrotate.d`) |
+| `tmp/gpcli/etc/monit/conf.d/programs` | Monit program checks and `gpmonitor` exec pattern |
+| `tmp/gpcli/docs/monit-slack-notifications.md` | monit → `gpmonitor` → GridPane API → Slack chain |
+
+| Topic | URL | Used by |
+|---|---|---|
+| GP-CLI Quick Reference | https://gridpane.com/kb/gp-cli-quick-reference/ | tooling |
+| Useful Commands for Managing GridPane Servers | https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/ | tooling |
+| GridPane Logs — locations and meaning | https://gridpane.com/kb/gridpane-logs-how-to-find-them-and-when-to-use-them/ | tooling |
+| GridPane sitemap (KB enumeration for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
+| GridPane changelog (Upvoty-backed SPA; capture deferred) | https://roadmap.gridpane.com/changelog | tooling |
+
 ## Non-GridPane references
 
 | Topic | URL |

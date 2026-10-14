@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `gridpane-tooling` (in progress): the developer view of GridPane servers.
+  `references/server-layout.md` maps the deployed tooling (`/usr/local/bin/gp`,
+  `gp<cmd>` wrappers, `lib/`, `monit-scripts/`, `gridpane.ver`), `/etc/monit`,
+  GridPane state and credentials (`/opt/gridpane`, `/root/gridcreds`,
+  `/root/gridenv`), config and log locations, schedules, and the paths an update
+  overwrites. Sourced from a maintainer-supplied snapshot of the deployed scripts
+  (`tmp/gpcli`).
+- `gridpane-tooling/references/gp-architecture.md` and
+  `references/gp-command-reference.md`: the `gp` dispatcher/wrapper/`lib` model,
+  versioning and update flow, monit integration, and the complete top-level
+  command tree (including internal commands such as `audit`, `conf` and
+  `function-run`) mapped to the functions they call.
+- `gridpane-tooling/references/developing-tools.md`: where custom tooling may
+  live, config I/O via the env files, logging and redaction, callbacks and
+  notifications, the monit → `gpmonitor` → Slack worked example, and the
+  testing/deploy conventions.
+- `gridpane-tooling/scripts/scrape-docs.sh` and
+  `references/docs-manifest.json`: a read-only KB indexer (sitemap → manifest of
+  url/title/lastmod/fetched_at/sha256, optional Markdown via pandoc) plus
+  `references/docs.md` documenting the pipeline and the deferred Upvoty-backed
+  changelog. Offline test in `tests/scripts/test_scrape_docs.sh`, wired into CI.
+- `tests/triggers/gridpane-tooling.yaml` (8 should / 5 should-not) and a README
+  skill-table row for `gridpane-tooling`; `gridpane-core` and `gridpane-gp-cli`
+  cross-link the new references.
+
 - `gridpane-core/references/gridenv.md`: the `/root/gridenv` server-state files
   (active-sites, promethean, nginx, php{VERSION}, mysql, redis*, monit, backups,
   sys-upgrades, ACME), with a key reference, secret-key list and safe read
@@ -27,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scripts/lint-skills.sh` excludes the generated `docs-manifest.json` from the
+  prose domain/secret/IP scans (it is machine-generated metadata whose page
+  titles mention third-party domains).
 - `gridpane-wordpress/references/caching.md`: document both page-cache header
   families — `X-Grid-SRCache-Fetch`/`X-Grid-SRCache-TTL`/`x-grid-srcache-skip`
   for Redis page caching and `X-Grid-Cache`/`X-Grid-Cache-TTL`/`x-grid-cache-skip`

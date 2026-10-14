@@ -18,4 +18,6 @@ jobs:
       - name: Lint skills
         run: ./scripts/lint-skills.sh
       - name: Run script tests
-        run: ./tests/scripts/test_gp_api.sh
+        run: |
+          ./tests/scripts/test_gp_api.sh
+          ./tests/scripts/test_scrape_docs.sh

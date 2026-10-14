@@ -1,0 +1,20 @@
+# Trigger evaluation for gridpane-tooling.
+# Prompts that should select this skill, and prompts that should not
+# (they belong to a sibling skill). See AGENTS.md and PLAN.md Phase 6.
+
+should_trigger:
+  - "where do the gridpane server scripts live on the box"
+  - "how is the gp command structured internally"
+  - "I want to write a custom script that runs on our gridpane server"
+  - "what does gpupdate overwrite when it runs"
+  - "where should I put a custom tool so gridpane updates don't remove it"
+  - "how do gridpane monit checks send notifications"
+  - "which logs should my gridpane tool write to"
+  - "list every top-level gp command from the dispatcher"
+
+should_not_trigger:
+  - "write a bash script to parse a csv file"
+  - "example.com on gridpane is returning 502 right now"
+  - "add a custom nginx rule to block xmlrpc on example.com"
+  - "build me a wordpress plugin that adds a shortcode"
+  - "how do I install nginx on a fresh ubuntu box"

@@ -42,6 +42,10 @@ Load the references on demand rather than all at once:
 - `references/stack-overview.md` — request flow and server model.
 - `references/sources.md` — every fact's source and the date checked.
 
+For building or debugging your own tooling on a server (the `/usr/local/bin` +
+`lib/` scripts, the `gp` dispatcher, where custom tools may live), see the
+sibling `gridpane-tooling` skill.
+
 ## Workflow
 
 1. **Identify the target.** Get the site URL, the web server in use (Nginx or

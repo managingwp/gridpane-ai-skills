@@ -5,6 +5,10 @@ extracted from the GP-CLI Quick Reference and the dedicated KB articles
 (see `sources.md`). When in doubt, confirm flags with `gp … --help` on the
 server before running.
 
+For the complete dispatcher view — every top-level command including internal
+ones such as `audit`, `conf` and `function-run`, mapped to the functions they
+call — see `gridpane-tooling/references/gp-command-reference.md`.
+
 Legend: **[READ]** inspect, **[WRITE]** reversible change, **[DESTRUCTIVE]** hard
 to reverse.
 

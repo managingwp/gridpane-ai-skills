@@ -20,6 +20,7 @@ These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or 
 | `gridpane-wordpress` | WP-CLI as the site user, caching (FastCGI / Redis Page / Object), cron, staging and migrations | Read / Write |
 | `gridpane-security` | 7G/6G WAF, ModSecurity, Fail2ban, Cloudflare real-IP/proxy setup, and compromised-site first response | Read / Write |
 | `gridpane-api` | Fleet-wide inventory and actions through the GridPane REST API | Read / Write |
+| `gridpane-tooling` | Building, deploying or debugging custom tooling on a GridPane server: the `/usr/local/bin` + `lib/` scripts, the `gp` dispatcher, config/log locations, monit hooks and the docs manifest | Read |
 
 **Mode** describes what the skill may do by default. *Read* skills only inspect. *Write* skills propose changes and run them only after explicit confirmation (see [Safety model](#safety-model)).
 

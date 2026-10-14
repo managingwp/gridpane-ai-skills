@@ -33,9 +33,24 @@ the skill and reference file that mentions it, plus what would confirm it.
   ranges (`gridpane-gp-cli/references/command-reference.md`).
 - **`gpupdate` semantics.** Whether it is purely a refresh or can change state.
 - **`/root/gridenv` write protection.** Reported (third-party) as `chattr +i`
-  immutable; the KB confirms several files live there but not the protection
-  mechanism. Confirm on a real server (`lsattr /root/gridenv`).
-  (`gridpane-core/references/gridenv.md`)
+  immutable. Evidence from the `gpcli` snapshot: `gridpane::conf_write` runs
+  `chattr -i` on the target env file before writing (`lib/gridpane.sh:1059`),
+  which strongly implies the immutable bit is set. Confirm on a real server
+  (`lsattr /root/gridenv`). (`gridpane-core/references/gridenv.md`,
+  `gridpane-tooling/references/developing-tools.md`)
+- **Custom files under `/usr/local/bin`.** Whether an unrelated custom file
+  survives a `gpupdate` run is unverified: `lib/update.sh` deploys with per-file
+  `cp` plus a hardcoded cleanup block, but there is no confirmed guarantee.
+  `gridpane-tooling/references/developing-tools.md` advises placing tooling
+  elsewhere.
+- **GridPane changelog capture.** `roadmap.gridpane.com/changelog` is a
+  JavaScript SPA backed by Upvoty; plain `curl` returns only the app shell.
+  Capturing it needs the Upvoty board/API identifier, an RSS/export, or a
+  headless browser. Deferred until the maintainer supplies the details
+  (`gridpane-tooling/references/docs.md`).
+- **`gridpane::callback::app` payload contract.** The full set of app endpoints
+  and required fields beyond `monitor::main`'s use is unverified
+  (`gridpane-tooling/references/developing-tools.md`).
 - **`/root/gridenv` key completeness.** The key tables come from a
   2026-10-09 capture plus KB-named keys; new keys appear as GridPane ships
   features. Undocumented keys (`gpfailsync-running`,
