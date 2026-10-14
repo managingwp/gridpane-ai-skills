@@ -1,0 +1,14 @@
+# Trigger evaluation for gridpane-core.
+# Core should load for essentially any GridPane mention.
+
+should_trigger:
+  - "any gridpane task"
+  - "how are gridpane servers laid out"
+  - "what files does gridpane regenerate that I must not edit"
+  - "what is the gridpane safety protocol"
+  - "where does gridpane store per-site logs"
+
+should_not_trigger:
+  - "how do I set up nginx on a fresh ubuntu box"
+  - "explain how dns works"
+  - "write a fibonacci function in python"

@@ -110,17 +110,17 @@ The umbrella workflow. It routes to the other skills and doesn't duplicate them.
 
 ## Phase 6: Evaluation
 
-- [ ] `tests/triggers/<skill>.yaml` for every skill:
+- [x] `tests/triggers/<skill>.yaml` for every skill:
   ```yaml
   should_trigger:
     - "example.com on gridpane is giving 502 bad gateway"
   should_not_trigger:
     - "how do I set up nginx on a fresh ubuntu box"
   ```
-- [ ] Check sibling skills don't collide (e.g. "clear cache" should hit `gridpane-wordpress`, not `gridpane-gp-cli`; resolve overlaps by sharpening descriptions)
-- [ ] Scenario walkthroughs: for 5 incidents (502 from PHP-FPM saturation, disk full from logs, redirect loop from Cloudflare Flexible SSL, cache not hitting on WooCommerce, Fail2ban banning Cloudflare), write the expected agent path in `tests/scenarios/*.md` and confirm the skills lead there
-- [ ] Safety review: grep every [WRITE]/[DESTRUCTIVE] command and confirm each has a backup step, a confirmation and a rollback
-- [ ] Final pass over `OPEN-QUESTIONS.md`; hand it to the maintainer
+- [x] Check sibling skills don't collide (e.g. "clear cache" should hit `gridpane-wordpress`, not `gridpane-gp-cli`; resolve overlaps by sharpening descriptions)
+- [x] Scenario walkthroughs: for 5 incidents (502 from PHP-FPM saturation, disk full from logs, redirect loop from Cloudflare Flexible SSL, cache not hitting on WooCommerce, Fail2ban banning Cloudflare), write the expected agent path in `tests/scenarios/*.md` and confirm the skills lead there
+- [x] Safety review: grep every [WRITE]/[DESTRUCTIVE] command and confirm each has a backup step, a confirmation and a rollback
+- [x] Final pass over `OPEN-QUESTIONS.md`; hand it to the maintainer
 
 ---
 

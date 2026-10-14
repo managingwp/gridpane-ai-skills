@@ -33,6 +33,10 @@ server, read `references/stack-overview.md`.
 Load the references on demand rather than all at once:
 
 - `references/paths.md` — where files and logs live, and what `gp` regenerates.
+- `references/gridenv.md` — `/root/gridenv` server state files: what they hold,
+  which keys are secret, and how to read them safely.
+- `references/site-env.md` — the per-site `logs/{site.url}.env`: recorded cache
+  method (`cache-type`), PHP/pool, WAF and cron state, and secret keys.
 - `references/gp-conventions.md` — how `gp` commands are shaped, read vs mutate.
 - `references/safety.md` — the protocol and the exact confirmation template.
 - `references/stack-overview.md` — request flow and server model.
@@ -105,6 +109,9 @@ skill, which must carry its own backup and rollback.
   unlocked; `gp server -tmp-noexec disable` does that but weakens a hardening
   control. See `references/paths.md`.
 - **`/tmp` is cleared on reboot.** Do not store anything durable there.
+- **`/root/gridenv` holds live credentials.** Read individual non-secret keys
+  (`grep '^server-version:' ...`) rather than dumping the file; never edit it or
+  print secrets. See `references/gridenv.md`.
 
 ## Sources
 
@@ -113,4 +120,4 @@ skill, which must carry its own backup and rollback.
 - Useful Commands for Managing GridPane Servers — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 - The wp-config.php Location at GridPane — https://gridpane.com/kb/the-wp-config-php-location-at-gridpane/
 
-Last verified: 2026-10-07
+Last verified: 2026-10-09

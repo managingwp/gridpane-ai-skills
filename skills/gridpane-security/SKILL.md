@@ -123,4 +123,4 @@ fail2ban-client set wordpress-extra unbanip 203.0.113.10
 - Updating Cloudflare Real IPs — https://gridpane.com/kb/updating-cloudflare-real-ips/
 - Introduction to Maldet and ClamAV — https://gridpane.com/kb/an-introduction-to-maldet-and-clamav-malware-scanning/
 
-Last verified: 2026-10-07
+Last verified: 2026-10-09

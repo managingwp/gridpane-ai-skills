@@ -33,6 +33,12 @@ Request body fields (from the collection) include `backup_source` accepting
 `manual` or `automatic`; and `bup_schedule` accepting `hourly`, `daily`,
 `weekly`, `monthly`.
 
+Every **[WRITE]**/**[DESTRUCTIVE]** call follows
+`gridpane-core/references/safety.md`: state the effect, target and reversibility,
+confirm, and verify a backup exists before any purge. Rollback: set values back
+with the reciprocal call where the API supports it; a backup purge
+([DESTRUCTIVE]) cannot be undone.
+
 ## Using the wrapper
 
 ```bash

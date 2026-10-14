@@ -36,9 +36,11 @@ will refuse the origin connection.
 ## Caching interplay
 
 Cloudflare has its own cache. When diagnosing "my change didn't show", there are
-now two caches to consider: the server page cache (`X-Grid-Cache`) and
-Cloudflare's edge cache. Purge both. GridPane has a documented Cloudflare caching
-article; the Cloudflare APO feature also interacts with page caching.
+now two caches to consider: the server page cache and Cloudflare's edge cache.
+Purge both. On the origin, the page cache emits either `X-Grid-Cache` (FastCGI)
+or `X-Grid-SRCache-Fetch` (Redis page cache) — check both. GridPane has a
+documented Cloudflare caching article; the Cloudflare APO feature also interacts
+with page caching.
 
 ## Locking the origin to Cloudflare IPs
 

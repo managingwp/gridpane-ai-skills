@@ -8,6 +8,15 @@ server before running.
 Legend: **[READ]** inspect, **[WRITE]** reversible change, **[DESTRUCTIVE]** hard
 to reverse.
 
+Every **[WRITE]** and **[DESTRUCTIVE]** command here follows the protocol in
+`gridpane-core/references/safety.md`: show the command, effect, blast radius,
+backup and rollback, and wait for confirmation before running. Rollbacks in
+general: toggles/settings are re-run with the previous value or the `-off`/reset
+variant; service reload/restart has no data change; managed config is regenerated
+by `gp` so there is nothing to hand-restore. **[DESTRUCTIVE]** commands (site
+deletion, database drop, backup purge, staging overwrite) additionally require the
+user to name the action and a verified backup to exist.
+
 ## Services
 
 | Label | Command | Notes |

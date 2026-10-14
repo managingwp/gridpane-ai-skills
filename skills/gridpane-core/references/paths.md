@@ -32,6 +32,9 @@ in `sources.md`.
 | Server-wide `http` context include | `/etc/nginx/extra.d/http-context.conf` |
 | Safe copy destination GridPane will not overwrite | `/etc/nginx/extra.d/_custom/` |
 | Per-site includes (safe to add) | `/var/www/{site.url}/nginx/*-main-context.conf` |
+| Per-site FastCGI cache TTL (managed) | `/etc/nginx/common/{site.url}-fcgi-cache-var.conf` |
+| Per-site Redis page-cache TTL (managed) | `/etc/nginx/common/{site.url}-wp-redis.conf`, `/etc/nginx/common/{site.url}-proxy-http-rediscache.conf`, `/etc/nginx/common/{site.url}-proxy-https-rediscache.conf` |
+| Per-site ModSec reverse-proxy cache TTL (managed) | `/etc/nginx/common/{site.url}-proxy-cache-var.conf` |
 
 The active Nginx include lines are:
 
@@ -75,6 +78,7 @@ Under `/var/www/{site.url}/logs/`:
 
 | Log | Answers |
 |---|---|
+| `{site.url}.env` | Per-site GridPane state as `key:value` — cache method (`cache-type`), PHP version, pool size, WAF, cron. See `site-env.md` |
 | `debug.log` | WP debug output, when Secure WP Debug is on |
 | `gridpane-general.log` | Changes made in the site customizer |
 | `domains.log` | Domain add-on and primary-domain swaps |
@@ -110,6 +114,29 @@ ModSecurity events are written to the web server's site **error** log.
 | UFW firewall log | `/var/log/ufw_log` |
 | System log | `/var/log/syslog` |
 | System temporary directory (noexec on 22.04+) | `/tmp` |
+
+## GridPane server state (`/root/gridenv`)
+
+GridPane keeps its server-level configuration state in small `key:value` files
+under `/root/gridenv`. Read them to confirm what the server actually is instead
+of guessing from managed config files. They are read-only for you and contain
+credentials — never edit them and never print secrets. Full key reference and
+safety notes: `gridenv.md`.
+
+| Purpose | Path |
+|---|---|
+| Active site list on this server (one `:domain:` per line) | `/root/gridenv/active-sites.env` |
+| Server build/version and feature flags (mixed with secrets) | `/root/gridenv/promethean.env` |
+| Nginx/stack tuning and module availability | `/root/gridenv/nginx.env` |
+| Per-PHP-version FPM/OPcache settings | `/root/gridenv/php{VERSION}.env` |
+| MySQL/MariaDB tuning | `/root/gridenv/mysql.env` |
+| Redis tuning (single layout) | `/root/gridenv/redis.env` |
+| Redis page / object cache service tuning | `/root/gridenv/redis-page.env`, `/root/gridenv/redis-object.env` |
+| Monit warning/restart thresholds | `/root/gridenv/monit.env` |
+| Backup engine / backup secret | `/root/gridenv/backups.system`, `/root/gridenv/backups.token` |
+| GridPane Relay key | `/root/gridenv/relay.key` |
+| Unattended-upgrades settings | `/root/gridenv/sys-upgrades.env` |
+| ACME wildcard-SSL account and cert state (private keys) | `/root/gridenv/acme-wildcard-configs/{site.url}/` |
 
 ## Files GridPane regenerates — never hand-edit
 

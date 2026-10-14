@@ -87,8 +87,9 @@ gp wp example.com plugin list --skip-plugins
 
 ## Verify
 
-- Cache: response header `X-Grid-Cache` (`HIT`/`MISS`/`BYPASS`/`STALE`) and
-  `X-Grid-Cache-TTL`.
+- Cache: check **both** families — `X-Grid-Cache` (`HIT`/`MISS`/`BYPASS`/`STALE`)
+  for FastCGI or `X-Grid-SRCache-Fetch` (`HIT`/`MISS`/`BYPASS`) for Redis page
+  cache — plus the matching `X-Grid-Cache-TTL` / `X-Grid-SRCache-TTL`.
 - Cron: `gp wp {site.url} cron event list`, or the GP-Cron file in
   `/etc/cron.d/gp-cron-{site-with-dashes}`.
 - Debug: read `/var/www/{site.url}/logs/debug.log`, then switch debug back off.
@@ -171,6 +172,9 @@ See `gridpane-core/references/paths.md`.
 - **`--ssh` is unsupported through `gp wp`**; use raw WP-CLI for that flag.
 - **Logged-in users never get a cached page** (`cache-control: private,
   no-store`). A "missing" cache while logged in is expected.
+- **Check the right cache header.** Redis page caching emits
+  `X-Grid-SRCache-Fetch`, not `X-Grid-Cache`. A missing `X-Grid-Cache` is not
+  proof the site is uncached. See `references/caching.md`.
 - **Debug on is a liability.** Turn `-wp-debug-off` as soon as you are done.
 - **Suspected compromise** (unexpected admins, spam, redirects, strange files):
   stop and hand off to `gridpane-security`.
@@ -180,8 +184,10 @@ See `gridpane-core/references/paths.md`.
 - GP WP-CLI — https://gridpane.com/kb/gp-wp-cli/
 - WP-Cron and GP-Cron — https://gridpane.com/kb/wp-cron-and-gridpanes-gp-cron-updated/
 - FastCGI Page Caching — https://gridpane.com/kb/using-gridpane-nginx-fastcgi-page-caching/
+- Redis Page Caching — https://gridpane.com/kb/using-gridpane-nginx-redis-page-caching/
+- Diagnosing Caching Issues — https://gridpane.com/kb/diagnosing-caching-issues/
 - Redis Object Caching — https://gridpane.com/kb/using-gridpane-redis-object-caching/
 - WP Debug and Query Monitor — https://gridpane.com/kb/wordpress-debug-and-query-monitor/
 - Migrations, Cloning and wp-config.php — https://gridpane.com/kb/migrations-cloning-and-the-wordpress-configuration-file-wp-config-php/
 
-Last verified: 2026-10-07
+Last verified: 2026-10-09

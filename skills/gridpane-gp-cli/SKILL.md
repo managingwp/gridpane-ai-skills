@@ -80,8 +80,9 @@ gp site example.com -switch-php 8.2
 ## Verify
 
 After a change, confirm with an observable check: response headers for caching
-(`X-Grid-Cache`), `gp php {version} -status` after a PHP switch, or the site
-serving 200 after a routing change. "No error" is not verification.
+(`X-Grid-Cache` for FastCGI or `X-Grid-SRCache-Fetch` for Redis page cache),
+`gp php {version} -status` after a PHP switch, or the site serving 200 after a
+routing change. "No error" is not verification.
 
 ## Rollback
 
@@ -120,4 +121,4 @@ Every [WRITE] command above includes its rollback. General rules:
 See `references/command-reference.md` for the verified command set and
 `gridpane-core/references/sources.md` for the rest.
 
-Last verified: 2026-10-07
+Last verified: 2026-10-09

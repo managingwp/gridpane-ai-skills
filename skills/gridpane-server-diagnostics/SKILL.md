@@ -23,8 +23,15 @@ Read the reference that matches the symptom:
 - `references/php-fpm.md` — per-site pools, `max_children` saturation, PHP slow log.
 - `references/mysql.md` — processlist, table locks, slow log, connection and buffer checks.
 - `references/logs.md` — which log answers which question, with one-liners.
+- `gridpane-core/references/gridenv.md` — `/root/gridenv` server state (active
+  sites, PHP versions, cache backends, Monit thresholds). Read individual
+  non-secret keys only.
 
-`scripts/gp-healthcheck.sh` runs the whole first pass in one shot:
+`scripts/gp-healthcheck.sh` runs the whole first pass in one shot. It also reports
+the GridPane environment (`/root/gridenv`): server version/build, active-site
+count, whether the Redis page/object caches are configured, and (with
+`--site`) the site's recorded page-cache method (`cache-type`) and object-cache
+state from its per-site env.
 
 ```bash
 # [READ] Whole-server snapshot as text (add --json for machine output).
@@ -56,7 +63,9 @@ not the problem.
 5. **Database.** Processlist locks, slow queries, connections, InnoDB buffer.
 6. **Redis.** Is the object/page cache out of memory?
 7. **Web server errors.** What is PHP/Nginx actually complaining about?
-8. **Recent GridPane activity.** Did something change just before the symptom?
+8. **GridPane environment.** Read `/root/gridenv` for the active-site list, PHP
+   versions, cache backends and this server's Monit thresholds.
+9. **Recent GridPane activity.** Did something change just before the symptom?
 
 Useful first-pass commands:
 
@@ -115,4 +124,4 @@ must carry its own backup and rollback.
 - GridPane Logs — https://gridpane.com/kb/gridpane-logs-how-to-find-them-and-when-to-use-them/
 - Useful Commands — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 
-Last verified: 2026-10-07
+Last verified: 2026-10-09

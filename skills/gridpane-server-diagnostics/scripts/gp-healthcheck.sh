@@ -4,7 +4,8 @@
 #
 # Collects: load average, memory and swap, root filesystem disk and inode use,
 # service states, per-pool PHP-FPM worker counts, established MySQL connections,
-# Redis memory use and recent 5xx counts from the web server access logs.
+# Redis memory use, the GridPane server environment (/root/gridenv) and recent
+# 5xx counts from the web server access logs.
 #
 # This script only reads. It never changes server state.
 #
@@ -24,13 +25,16 @@ usage() {
 Usage: ${SCRIPT_NAME} [--json] [--site DOMAIN] [--help]
 
 Read-only snapshot of a GridPane server: load, memory/swap, disk and inodes,
-service states, PHP-FPM pool worker counts, MySQL connections, Redis memory and
-recent 5xx counts from the web server access logs.
+service states, PHP-FPM pool worker counts, MySQL connections, Redis memory, the
+GridPane environment (/root/gridenv) and recent 5xx counts from the web server
+access logs.
 
 Options:
   --json          Emit machine-readable JSON to stdout instead of text.
   --site DOMAIN   Restrict per-site sections (PHP-FPM pools, access logs) to one
-                  domain. Without it, every site is reported.
+                  domain, and report that site's page-cache method from its
+                  per-site env (cache-type) or Nginx config. Without it, every
+                  site is reported.
   -h, --help      Show this help and exit.
 
 This script only reads state.
@@ -121,6 +125,57 @@ redis_memory() {
     fi
 }
 
+# Read a single non-secret key from a /root/gridenv env file. Prints nothing on
+# a miss. Only fixed, known-safe keys are ever requested.
+gridenv_value() {
+    local file="$1" key="$2"
+    [[ -r "$file" ]] || return 0
+    grep -m1 "^${key}:" "$file" 2>/dev/null | cut -d: -f2- || true
+}
+
+gridenv_active_site_count() {
+    local f="/root/gridenv/active-sites.env"
+    [[ -r "$f" ]] || { printf '0'; return 0; }
+    awk '/^:/ {c++} END {print c+0}' "$f" 2>/dev/null || printf '0'
+}
+
+gridenv_flag() {
+    # "true" if a /root/gridenv/<file> exists (feature configured on this server).
+    local f="$1"
+    if [[ -r "$f" ]]; then printf 'true'; else printf 'false'; fi
+}
+
+site_cache_method() {
+    # Determine a site's page cache. Read-only.
+    # Prefer the per-site env's recorded cache-type; fall back to Nginx config.
+    # Prints: redis | fastcgi | none | unknown.
+    local site="$1" f hits envfile
+    if [[ -z "$site" ]]; then printf 'unknown'; return 0; fi
+    envfile="/var/www/${site}/logs/${site}.env"
+    if [[ -r "$envfile" ]]; then
+        f="$(grep -m1 '^cache-type:' "$envfile" 2>/dev/null | cut -d: -f2- | tr -d '[:space:]' || true)"
+        if [[ -n "$f" ]]; then printf '%s' "$f"; return 0; fi
+    fi
+    local paths=("/etc/nginx/sites-available/${site}")
+    for f in /etc/nginx/common/"${site}"-*.conf; do
+        [[ -e "$f" ]] && paths+=("$f")
+    done
+    hits="$(grep -RhoE 'srcache[a-z_]*|redis2_query' "${paths[@]}" 2>/dev/null | sort -u || true)"
+    if [[ -n "$hits" ]]; then printf 'redis'; return 0; fi
+    hits="$(grep -RhoE 'fastcgi_cache[a-z_]*' "${paths[@]}" 2>/dev/null | sort -u || true)"
+    if [[ -n "$hits" ]]; then printf 'fastcgi'; return 0; fi
+    printf 'none'
+}
+
+site_object_cache() {
+    # The site's recorded Redis object-cache state. Read-only.
+    local site="$1" envfile
+    [[ -n "$site" ]] || return 0
+    envfile="/var/www/${site}/logs/${site}.env"
+    [[ -r "$envfile" ]] || return 0
+    grep -m1 '^redis-object-cache:' "$envfile" 2>/dev/null | cut -d: -f2- | tr -d '[:space:]' || true
+}
+
 collect_5xx() {
     # Best effort: field 9 is the status in the standard combined format.
     local pattern site
@@ -159,7 +214,7 @@ INODE_ROW="$(df -Pi / 2>/dev/null | awk 'NR==2 {print $2" "$3" "$5}' || printf '
 INODE_PCT="$(awk '{print $3}' <<<"$INODE_ROW")"
 
 SERVICE_LIST=""
-for svc in nginx mysql mariadb redis-server lshttpd; do
+for svc in nginx mysql mariadb redis-server redis-page redis-object lshttpd; do
     state="$(svc_state "$svc")"
     SERVICE_LIST+="${svc}=${state} "
     JSON_SERVICES+="{\"name\":\"$(json_escape "$svc")\",\"state\":\"$(json_escape "$state")\"},"
@@ -180,6 +235,17 @@ done <<<"$POOL_REPORT"
 
 MYSQL_CONNS="$(mysql_connections)"
 REDIS_MEM="$(redis_memory)"
+
+GP_ENV_DIR="/root/gridenv"
+GP_SERVER_VERSION="$(gridenv_value "$GP_ENV_DIR/promethean.env" server-version)"
+GP_SERVER_BUILD="$(gridenv_value "$GP_ENV_DIR/promethean.env" server-build)"
+GP_WEBSERVER="$(gridenv_value "$GP_ENV_DIR/promethean.env" webserver)"
+GP_ACTIVE_SITES="$(gridenv_active_site_count)"
+GP_REDIS_PAGE="$(gridenv_flag "$GP_ENV_DIR/redis-page.env")"
+GP_REDIS_OBJECT="$(gridenv_flag "$GP_ENV_DIR/redis-object.env")"
+GP_SITE_CACHE="$(site_cache_method "$SITE")"
+GP_SITE_OBJECT="$(site_object_cache "$SITE")"
+
 FIVEXX_REPORT="$(collect_5xx)"
 while read -r site count; do
     [[ -n "${count:-}" ]] || continue
@@ -202,6 +268,16 @@ if [[ "$OUTPUT_JSON" -eq 1 ]]; then
   "php_pools": [${JSON_POOLS%,}],
   "mysql_established_connections": "${MYSQL_CONNS}",
   "redis_used_memory": "$(json_escape "$REDIS_MEM")",
+  "gridpane_env": {
+    "server_version": "$(json_escape "$GP_SERVER_VERSION")",
+    "server_build": "$(json_escape "$GP_SERVER_BUILD")",
+    "webserver": "$(json_escape "$GP_WEBSERVER")",
+    "active_sites": ${GP_ACTIVE_SITES},
+    "redis_page_configured": ${GP_REDIS_PAGE},
+    "redis_object_configured": ${GP_REDIS_OBJECT},
+    "site_cache_method": "$(json_escape "$GP_SITE_CACHE")",
+    "site_object_cache": "$(json_escape "$GP_SITE_OBJECT")"
+  },
   "http_5xx_counts": [${JSON_5XX%,}]
 }
 EOF
@@ -231,6 +307,20 @@ else
 fi
 printf '\nMySQL established connections: %s\n' "$MYSQL_CONNS"
 printf 'Redis used memory: %s\n' "${REDIS_MEM:-unavailable}"
+printf '\nGridPane environment (/root/gridenv):\n'
+if [[ -r /root/gridenv ]]; then
+    printf '  server: %s %s (webserver: %s)\n' \
+        "${GP_SERVER_VERSION:-unknown}" "${GP_SERVER_BUILD:-unknown}" "${GP_WEBSERVER:-unknown}"
+    printf '  active sites on this server: %s\n' "$GP_ACTIVE_SITES"
+    printf '  redis page cache configured: %s\n' "$GP_REDIS_PAGE"
+    printf '  redis object cache configured: %s\n' "$GP_REDIS_OBJECT"
+else
+    printf '  (/root/gridenv not present or not readable)\n'
+fi
+if [[ -n "$SITE" ]]; then
+    printf '  site page cache method (%s): %s\n' "$SITE" "$GP_SITE_CACHE"
+    printf '  site redis object cache (%s): %s\n' "$SITE" "${GP_SITE_OBJECT:-unknown}"
+fi
 printf '\nHTTP 5xx responses by site (from access logs):\n'
 if [[ -n "$FIVEXX_REPORT" ]]; then
     while read -r site count; do

@@ -3,7 +3,10 @@
 Every GridPane-specific fact used in the skills is traced here. Re-check the page
 before relying on a fact; GridPane changes over time.
 
-All pages checked **2026-10-07**.
+All pages checked **2026-10-07** unless noted. Pages added on **2026-10-09** are
+marked in the tables below. A maintainer-supplied capture of `/root/gridenv` from
+a real GridPane server (2026-10-09) is the source for the server-state files in
+`gridenv.md`; secret values were redacted before anything was written down.
 
 ## Core
 
@@ -22,6 +25,8 @@ All pages checked **2026-10-07**.
 | Set a GridPane site as the Default Site for Nginx | https://gridpane.com/kb/set-a-gridpane-site-as-the-default-site-for-nginx/ |
 | GridPane API Introduction and Postman Documentation | https://gridpane.com/kb/gridpane-api-introduction-and-postman-documentation/ |
 | Migrations, Cloning and wp-config.php (custom user-configs) | https://gridpane.com/kb/migrations-cloning-and-the-wordpress-configuration-file-wp-config-php/ |
+| Configure Monit with GP-CLI (`/root/gridenv/monit.env`) | https://gridpane.com/kb/configure-monit-with-gp-cli/ *(added 2026-10-09)* |
+| Nginoil (`/root/gridenv/nginx.env`) | https://gridpane.com/kb/nginoil-automatically-fix-nginx-syntax-errors/ *(added 2026-10-09)* |
 
 ## Referenced by later skills
 
@@ -46,6 +51,8 @@ All pages checked **2026-10-07**.
 | GridPane FastCGI Page Caching | https://gridpane.com/kb/using-gridpane-nginx-fastcgi-page-caching/ | wordpress |
 | GridPane Redis Page Caching | https://gridpane.com/kb/using-gridpane-nginx-redis-page-caching/ | wordpress |
 | GridPane Redis Object Caching | https://gridpane.com/kb/using-gridpane-redis-object-caching/ | wordpress |
+| Diagnosing Caching Issues (both header families) | https://gridpane.com/kb/diagnosing-caching-issues/ | wordpress *(added 2026-10-09)* |
+| Exclude a Page or Cookie from Nginx Server Caching | https://gridpane.com/kb/exclude-a-page-from-server-caching/ | wordpress *(added 2026-10-09)* |
 | How to Clear Your Website Caches (all methods) | https://gridpane.com/kb/how-to-clear-your-website-caches-all-methods/ | wordpress |
 | WP-Cron and GridPane's GP-Cron | https://gridpane.com/kb/wp-cron-and-gridpanes-gp-cron-updated/ | wordpress |
 | Working with WooCommerce | https://gridpane.com/kb/working-with-woocommerce/ | wordpress |

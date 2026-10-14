@@ -75,6 +75,10 @@ Group by intent, not by name:
 
 ## Scope rules
 
+Commands labelled **[WRITE]** or **[DESTRUCTIVE]** here still follow
+`references/safety.md`: propose with effect, blast radius, backup and rollback,
+and wait for confirmation. Informational commands are [READ] and may run freely.
+
 - `gp site {site.url} ...` → one site.
 - `gp site all-sites ...` (e.g. `sync-php-settings`) → **every site on the
   server**. Server-wide [WRITE].
