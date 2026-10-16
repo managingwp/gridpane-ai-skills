@@ -13,10 +13,6 @@ the skill and reference file that mentions it, plus what would confirm it.
   server size (the capture showed a server-level `pm.max_children:2` and a
   per-site `16`); a per-size reference would confirm the pattern
   (`gridpane-server-diagnostics/references/php-fpm.md`).
-- **Cloudflare real-IP mechanism.** The snapshot shows only
-  `set_real_ip_from`/`real_ip_header X-Forwarded-For` (`lib/nginx.sh:922-924`) and
-  `cloudflare_ips()` (`lib/cf.sh`); whether Cloudflare restoration is
-  app/config-driven needs confirmation (`gridpane-security/references/cloudflare.md`).
 - **ModSecurity ruleset version.** Default paranoia level is `1` (capture +
   `lib/waf.sh`), but the exact CRS ruleset version on current stacks is unverified
   (`gridpane-security/references/waf.md`).

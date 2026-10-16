@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `gridpane-tooling/references/gp-command-reference.md`: add the dispatcher's
   `gp site` flag set, grouped, and reconcile the KB reference's 117 flags against
   the dispatcher (all present).
+- `gridpane-security/references/cloudflare.md`: document the verified real-IP
+  chain (`gridpane-realip.conf` → `*cloudflare-realip.conf`, `CF-Connecting-IP`,
+  ranges staged at `/opt/gridpane/cf_*.ip`).
 
 ## v0.2.0 - 2026-10-16
 
