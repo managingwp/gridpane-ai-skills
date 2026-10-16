@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Resolve the snapshot-verifiable items in `OPEN-QUESTIONS.md`: the Nginx
+  PHP-context include (`/etc/nginx/extra.d/*-php-context.conf`), the `/tmp`
+  fstab line, the MySQL slow-log path (`/var/log/mysql/slow.log`), the split
+  Redis config paths, `gpupdate` as [WRITE], the ModSecurity paranoia default,
+  and `/root/gridenv` `chattr +i`.
+
+## v0.2.0 - 2026-10-16
+
 ### Added
 
-- `gridpane-tooling` (in progress): the developer view of GridPane servers.
+- `gridpane-tooling`: the developer view of GridPane servers.
   `references/server-layout.md` maps the deployed tooling (`/usr/local/bin/gp`,
   `gp<cmd>` wrappers, `lib/`, `monit-scripts/`, `gridpane.ver`), `/etc/monit`,
   GridPane state and credentials (`/opt/gridpane`, `/root/gridcreds`,

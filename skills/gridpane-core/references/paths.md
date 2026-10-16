@@ -69,7 +69,9 @@ Example slow-log path for `example.com` on PHP 7.3: `/var/log/example.com73.log.
 |---|---|
 | MySQL/MariaDB data directory | `/var/lib/mysql` |
 | MySQL/MariaDB service and error log | `/var/log/mysql/error.log` |
-| Redis config | `/etc/redis/redis.conf` |
+| MySQL slow query log | `/var/log/mysql/slow.log` (the path GridPane's scripts use, `lib/stack.sh`) |
+| Redis config (single-Redis) | `/etc/redis/redis.conf` |
+| Redis page / object cache config (split) | `/etc/redis/redis-page.conf`, `/etc/redis/redis-object.conf` |
 | Redis log | `/var/log/redis/redis-server.log` |
 
 ## Site logs (per site)
@@ -158,7 +160,12 @@ file for PHP constants. Copy server-wide includes into
 ## /tmp hardening (Ubuntu 22.04 and later)
 
 GridPane mounts `/tmp` as `noexec` by default so a compromised site cannot run
-binaries from it. `/tmp` is cleared on reboot.
+binaries from it. `/tmp` is cleared on reboot. The exact line GridPane writes to
+`/etc/fstab` (`lib/server.sh:735`) is:
+
+```
+tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777 0 0
+```
 
 ```bash
 # [READ] Check whether /tmp is mounted noexec (look for "noexec").
@@ -179,9 +186,6 @@ gp server -tmp-noexec enable
 
 ## Unverified
 
-- Exact MySQL **slow query** log filename: the logs KB page gives
-  `/var/log/mysql/error.log` for the slow log in one place but shows
-  `cat /var/log/mysql/slow.log` elsewhere. Confirm on a real server before
-  relying on either path. Tracked in `OPEN-QUESTIONS.md`.
-- Whether MariaDB (rather than MySQL) is the default engine on current
-  GridPane stacks, and how that changes `systemctl` unit names.
+- Whether every current stack is Percona (the capture shows Percona; the scripts
+  also detect MariaDB) and the exact `systemctl` unit names on a MariaDB box.
+  The snapshot references `mysql.service` (`lib/services.sh:329`).

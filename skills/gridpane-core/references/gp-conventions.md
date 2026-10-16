@@ -41,13 +41,16 @@ gp stack --help
 Also useful for orientation:
 
 ```bash
-# [READ] Make sure the GridPane scripts are current before relying on them.
+# [WRITE] Refresh GridPane's own scripts. Blast radius: whole server (it
+# replaces /usr/local/bin and applies config updates). Rollback: re-run after
+# pinning to the previous version; there is no per-file undo. Confirm first.
 gpupdate
 ```
 
-`gpupdate` refreshes GridPane's own scripts. Treat it as [WRITE] if it is offered
-as a flag that changes state; as a plain refresh it is effectively read-only for
-your site data, but confirm with `gpupdate --help` first.
+`gpupdate` refreshes GridPane's own scripts **and changes state**: it fetches the
+packaged scripts/configs for the update branch, `rsync`s and installs them, and
+removes superseded files (`lib/update.sh`). Treat it as **[WRITE]** under the
+safety protocol, not as a passive refresh.
 
 ## Reading the activity log
 

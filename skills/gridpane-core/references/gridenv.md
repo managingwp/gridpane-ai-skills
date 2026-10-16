@@ -177,12 +177,17 @@ considers "high" on this specific server rather than assuming a fleet default.
   capture (2026-10-09) `redis.env`, `redis-page.env` and `redis-object.env` all
   coexisted, with `redis-server:true` alongside `redis-page:true` and
   `redis-object:true`, and Monit tracking all three services. The split is the
-  reliable signal; the `redis.env` file can remain as base/legacy tuning.
+  reliable signal; the `redis.env` file can remain as base/legacy tuning. The
+  split services read `/etc/redis/redis-page.conf` and
+  `/etc/redis/redis-object.conf` (`lib/health_test.sh:49`, `lib/workers.sh`).
 
 ## Gotchas
 
-- **Treat the directory as immutable and read-only.** GridPane rewrites it and
-  reportedly marks it write-protected; editing or deleting files is not a
+- **Treat the directory as immutable and read-only.** GridPane marks env files
+  `chattr +i` (e.g. `active-sites.env` `lib/site.sh:8071`, `backups.token`
+  `lib/tools.sh:1192`, `mysql.env` `lib/workers.sh:16031`), and
+  `gridpane::conf_read`/`conf_write` run `chattr -i /root/gridenv/` before
+  touching them (`lib/gridpane.sh:836`). Editing or deleting files is not a
   supported operation.
 - **It contains live credentials.** Anonymise before sharing: redact every key
   listed as a secret above, all `acme-wildcard-configs/` contents, and the
@@ -199,13 +204,12 @@ considers "high" on this specific server rather than assuming a fleet default.
 
 ## Unverified
 
-- Whether `/root/gridenv` is always `chattr +i` (write-protected), and how that
-  behaves on every Ubuntu release. Tracked in `OPEN-QUESTIONS.md`.
 - The complete key set for each file: new keys appear as GridPane adds features.
   The tables here cover the keys seen in maintainer-supplied output dated
   2026-10-09 plus the keys the KB names explicitly.
-- Which Redis config the split `redis-page`/`redis-object` services actually read,
-  and whether the coexisting `redis.env` has any effect on them.
+- Whether the coexisting `redis.env` has any effect on the split
+  `redis-page`/`redis-object` services (their configs are
+  `/etc/redis/redis-page.conf` and `/etc/redis/redis-object.conf`).
 - The meaning of every `promethean.env` key (some, such as `gpfailsync-running`
   and `configs-update-processing`, are not documented in the KB).
 

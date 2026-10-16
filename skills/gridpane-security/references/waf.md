@@ -133,8 +133,10 @@ nginx -t && gp ngx -reload
 
 ## Unverified
 
-- The exact ModSecurity ruleset/version and default paranoia level on current
-  stacks. Confirm on the server before quoting defaults.
+- The exact ModSecurity CRS ruleset/version on current stacks. The default
+  paranoia level is `1` (per-site env capture; `lib/waf.sh` reads it from the
+  per-site `modsec/{site}-crs-paranoia-level.conf`). Confirm the ruleset version
+  on the server before quoting it.
 
 ## Sources
 

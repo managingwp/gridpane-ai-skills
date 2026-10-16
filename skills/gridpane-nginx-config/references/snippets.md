@@ -58,16 +58,19 @@ Then apply it in a site include:
 location = /wp-login.php {
     limit_req zone=wplogin burst=5 nodelay;
     # let GridPane's own php handling serve the request:
-    include /etc/nginx/common/*-php-context.conf;
+    include /etc/nginx/extra.d/*php-context.conf;
+    include /etc/nginx/extra.d/*-php-context.conf;
 }
 ```
 
 - Rollout: add the zone to `http-context.conf`, the location to the site include,
   `nginx -t`, reload.
 - Rollback: remove both blocks, `nginx -t`, reload.
-- Note: if the location conflicts with GridPane's existing wp-login handling,
-  `nginx -t` fails; use GridPane's documented PHP-context include instead. The
-  exact PHP-include filename should be confirmed on the server (see Unverified).
+- Note: GridPane's PHP `location` includes
+  `/etc/nginx/extra.d/*php-context.conf` and `*-php-context.conf`
+  (`lib/stack.sh:4106-4107`); include the same files so PHP still runs. If the
+  location conflicts with GridPane's existing wp-login handling, `nginx -t`
+  fails; use a different path or the documented PHP-context include instead.
 
 ## Add a custom response header
 
@@ -137,9 +140,6 @@ OLS does not use these Nginx includes. Related OLS mechanisms:
 
 ## Unverified
 
-- The exact GridPane PHP-context include filename used inside the PHP `location`
-  (the KB references a `*-php-context.conf` include for PHP-level rules). Confirm
-  on the server before relying on the rate-limit `include` line above.
 - Whether the default GridPane wp-login handling uses an exact-match `location`
   that would collide with the snippet above.
 
