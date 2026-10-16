@@ -145,10 +145,43 @@ call any function, including mutating ones.
 
 `gpupdate`, `gpcheck` and `gpgit` are standalone scripts, not wrappers.
 
+## Site flags (from the dispatcher)
+
+`gp site {site.url} …` accepts a large flag set. These are the meaningful
+user-facing flags, grouped, as they appear in the dispatcher's `site` case
+(`gp:601-2454`). Most also accept an un-prefixed alias. Flag-level usage and
+units are in `gridpane-gp-cli/references/command-reference.md`.
+
+| Group | Flags |
+|---|---|
+| Domains / routing | `-add-domain`, `-delete-domain`, `-add-301-domain`, `-create-domain-wildcard`, `-route-domain-root`, `-route-domain-www`, `-route-domain-off`, `-swap-primary-domain`, `-set-nginx-default`, `-set-openlitespeed-default` |
+| SSL | `-domain-ssl-on/-off`, `-domain-wildcard-ssl-on/-off`, `-primary-ssl-on/-off`, `-primary-wildcard-ssl-on/-off`, `-wildcard-ssl-on/-off`, `-auto-ssl`/`-enable-auto-ssl`/`-disable-auto-ssl`, `-renew-ssl`, `-renew-domain-ssl`, `-dns-creds`, `-update-dns-creds`, `-delete-dns-creds` |
+| Caching | `-fastcgi-caching`, `-redis-caching`, `-redis-cache`, `-cache-off`, `-redis-object-caching`, `-cache-valid`, `-fcgi-cache-valid`, `-redis-cache-valid`, `-proxy-cache-valid`, `-enable-object-cache-pro`, `-disable-object-cache-pro`, `-update-object-cache-pro` |
+| WAF / hardening | `-modsec-on/-off`, `-modsec-settings`, `-block-*`/`-unblock-*` (`wp-content.php`, `wp-comments-post.php`, `wp-links-opml.php`, `wp-trackbacks.php`, `install.php`, `upgrade.php`, `wpscan-agent`), `-disable-xmlrpc`/`-enable-xmlrpc`, `-disable-username-enum`/`-enable-username-enum`, `-disable-wp-version`/`-enable-wp-version`, `-disable-rss`/`-enable-rss`, `-disable-emoji`/`-enable-emoji`, `-maldet-scan` |
+| Headers / transport | `-http-auth`/`-http-auth-off`, `-csp-header-on/-off`, `-clickjacking-protection-on/-off`, `-brotli-on/-off`, `-http2-push-preload-on/-off` |
+| PHP | `-switch-php`, `-update-php`, `-php-settings`, `-set-chroot-php`, `-phpver` |
+| Cron | `-gpcron-on`, `-gpcron-off` |
+| Backups | `-enable-local-backups`, `-enable-remote-backups`, `-purge-backups`, `-purge-backups-and-gridpane-logs`, `-purge-gridpane-logs`, `-backups-time` |
+| Staging / clone | `-staging`, `-staging-no-bup`, `-staging-no-db`, `-staging-only-db`, `-pre-clone-check`, `-clone-check` |
+| Users | `-add-wp-users`, `-rotate-wp-user-passwords`, `-wp-user-passwords`, `-create-new-user` |
+| Fail2ban | `-enable-wp-fail2ban`/`-disable-wp-fail2ban`, `-configure-wp-fail2ban` |
+| Debug | `-wp-debug-on/-off`, `-wsod-on/-off` |
+| Site state | `-suspend`, `-unsuspend` |
+| Sync (all-sites) | `-sync-php-settings`, `-sync-6g-settings`, `-sync-7g-settings`, `-sync-modsec-settings`, `-sync-wpf2b-settings`, `-sync-nginx-cache-settings`, `-sync-object-cache-settings`, `-sync-nginx-settings`, `-sync-access-settings`, `-sync-additional-security-settings`, `-sync-fortress-settings`, `-sync-from-app` |
+
+### Reconciliation
+
+On 2026-10-16 every `-flag` documented in
+`gridpane-gp-cli/references/command-reference.md` (117 of them) was found in the
+dispatcher, so the KB reference is current for the flags it covers. The
+dispatcher also contains many internal aliases not documented in the KB; use the
+KB reference for user-facing usage and this table for the dispatcher's set.
+
 ## Unverified
 
-- Exact accepted flags and units for every subcommand; confirm from `gp … --help`
-  on a real server (same caveat as `gridpane-gp-cli`).
+- Exact accepted units and value ranges for every flag; confirm from
+  `gp … --help` on a real server. The flag *set* is reconciled against the KB
+  reference above; the value ranges are not.
 - The `[?]` labels above (`loop`, parts of `conf`) — confirm whether they change
   state.
 - Whether `scan` still fronts Patchstack scanning; the snapshot has no separate
@@ -159,5 +192,6 @@ call any function, including mutating ones.
 - `tmp/gpcli/usr/local/bin/gp` (dispatch table, subcommands, exit codes).
 - `tmp/gpcli/usr/local/bin/gpupdate` (update dispatch).
 - `tmp/gpcli/README.md` (areas and wrappers).
+- `gridpane-gp-cli/references/command-reference.md` (flag reconciliation).
 
-Last verified: 2026-10-14
+Last verified: 2026-10-16

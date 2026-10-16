@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fstab line, the MySQL slow-log path (`/var/log/mysql/slow.log`), the split
   Redis config paths, `gpupdate` as [WRITE], the ModSecurity paranoia default,
   and `/root/gridenv` `chattr +i`.
+- `gridpane-tooling/references/gp-command-reference.md`: add the dispatcher's
+  `gp site` flag set, grouped, and reconcile the KB reference's 117 flags against
+  the dispatcher (all present).
 
 ## v0.2.0 - 2026-10-16
 
