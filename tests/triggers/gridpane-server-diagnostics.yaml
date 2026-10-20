@@ -10,6 +10,8 @@ should_trigger:
   - "show me the mysql processlist on our gridpane server"
   - "how much redis memory is our gridpane server using"
   - "give me a health snapshot of the gridpane server"
+  - "an openlitespeed site on gridpane keeps returning 503"
+  - "check lshttpd memory on the gridpane server"
 
 should_not_trigger:
   - "example.com is down and returning 502 right now"

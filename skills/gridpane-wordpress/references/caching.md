@@ -7,15 +7,17 @@ change "didn't work".
 
 | Layer | What it holds | Where it is configured |
 |---|---|---|
-| Nginx FastCGI page cache | Full HTML pages | Site customizer > Caching, or `gp site … -fastcgi-cache` |
-| Redis page cache | Full HTML pages (alternative to FastCGI) | Site customizer, or `gp site … -redis-cache` |
+| Nginx FastCGI page cache | Full HTML pages (Nginx) | Site customizer > Caching, or `gp site … -fastcgi-cache` |
+| Nginx Redis page cache | Full HTML pages (Nginx, alternative to FastCGI) | Site customizer, or `gp site … -redis-cache` |
+| OLS LSCache page cache | Full HTML pages (OpenLiteSpeed) | Site customizer > LSCache Page Caching, or `gpols site … --cache page` |
 | Redis object cache | WordPress database query results | Site customizer > Object Caching, or `gp site … -redis-object-caching` |
 | CDN / Cloudflare | Full responses at the edge | Cloudflare dashboard |
 | Browser | Full responses | Browser cache |
 
 Nginx uses FastCGI page caching; the alternative page cache is Redis page
 caching. **Object caching is separate from page caching.** On OpenLiteSpeed the
-page cache is LSCache / the LiteSpeed Cache plugin, not FastCGI.
+page cache is **LSCache** (the LiteSpeed Cache plugin), not FastCGI or Redis
+page cache.
 
 ## Which page cache is active?
 
@@ -29,12 +31,16 @@ concluding anything:
 
 | Page cache | Success header | TTL header | Bypass-reason header |
 |---|---|---|---|
-| Redis page cache | `X-Grid-SRCache-Fetch: HIT \| MISS \| BYPASS` | `X-Grid-SRCache-TTL` | `x-grid-srcache-skip` |
-| FastCGI page cache | `X-Grid-Cache: HIT \| MISS \| BYPASS \| STALE` | `X-Grid-Cache-TTL` | `x-grid-cache-skip` |
+| Nginx Redis page cache | `X-Grid-SRCache-Fetch: HIT \| MISS \| BYPASS` | `X-Grid-SRCache-TTL` | `x-grid-srcache-skip` |
+| Nginx FastCGI page cache | `X-Grid-Cache: HIT \| MISS \| BYPASS \| STALE` | `X-Grid-Cache-TTL` | `x-grid-cache-skip` |
+| OLS LSCache | `X-LiteSpeed-Cache: hit \| miss` | `X-LiteSpeed-Cache-Control` (`public,max-age=…`) | `X-LiteSpeed-Cache-Control: no-cache` |
 
-**Trap:** the absence of `X-Grid-Cache` does **not** mean the site is uncached.
+**Trap 1:** the absence of `X-Grid-Cache` does **not** mean the site is uncached.
 A Redis-page-cached site emits `X-Grid-SRCache-Fetch` instead. If you only look
 for `X-Grid-Cache`, you will wrongly report a Redis-cached site as uncached.
+
+**Trap 2:** OLS does not emit the `X-Grid-*` headers at all. An OLS site uses
+`X-LiteSpeed-Cache: hit|miss`; a missing `X-Grid-Cache` there is expected.
 
 ### Server-side: confirm the method per site
 
@@ -78,8 +84,11 @@ grep -E '^(cache-type|redis-object-cache|ngx-redis-cache-valid|nginx-caching-ttl
 ```
 
 - `cache-type:redis` → Redis page cache → expect `X-Grid-SRCache-Fetch`.
-- A FastCGI/off value has not been observed yet; confirm the exact string on a
-  real server before relying on it (see `OPEN-QUESTIONS.md`).
+- `cache-type:fastcgi` → FastCGI page cache → expect `X-Grid-Cache`.
+- `cache-type:off` → no page cache (any unrecognised value is coerced to `off`).
+- OpenLiteSpeed sites record LSCache state instead (`redis-page`, `page-only`,
+  `redis-only`, `off`). Values confirmed in `lib/site.sh`; see
+  `gridpane-core/references/site-env.md`.
 
 Other per-site signals that should agree:
 
@@ -131,6 +140,27 @@ The per-site Nginx config and the live headers are authoritative for a single
 site; `/root/gridenv` only sets the server-wide context. See
 `gridpane-core/references/gridenv.md`.
 
+### OpenLiteSpeed: LSCache
+
+On OLS the page cache is the **LiteSpeed Cache** plugin (LSCache). The GridPane
+customizer toggles **LSCache Page Caching** and **LSCache Redis Object Caching**;
+the toggle writes into the plugin, but the reverse is not true — changing the
+plugin does not change the GridPane toggle.
+
+Read the recorded state from the per-site env:
+
+```bash
+# [READ] OLS cache state: cache-type + the two LSCache toggles.
+grep -E '^(cache-type|ols-page-cache|ols-redis-cache|ols-redis-cache-valid):' \
+  /var/www/{site.url}/logs/{site.url}.env
+```
+
+- `ols-page-cache:true` / `ols-redis-cache:true` — the GridPane toggles.
+- `cache-type` — `redis-page` (page + object), `page-only`, `redis-only`, `off`.
+- Redis object caching connects over `/var/run/redis/redis-object.sock`.
+
+Verify with the LSCache headers below, not the Nginx families.
+
 ## Verify hits (response headers)
 
 Load the site **in an incognito window** (logged-in sessions bypass cache) and
@@ -151,6 +181,20 @@ and FastCGI are mutually exclusive per site:
 ```bash
 # [READ] Check both cache header families (use a cache-busting UA if needed).
 curl -sSI https://example.com | grep -iE 'x-grid-(cache|srcache)'
+```
+
+On **OLS**, none of the `X-Grid-*` headers appear. Check LSCache instead:
+
+- `X-LiteSpeed-Cache: hit | miss` — `miss` means the page was generated this
+  time and cached for the next request; `hit` means it was served from cache.
+- `X-LiteSpeed-Cache-Control` — `public,max-age=…` when cacheable, `no-cache`
+  when intentionally not cached (logged-in, excluded, etc.).
+- `X-LiteSpeed-Tag` — cache tags. Behind the LiteSpeed QUIC CDN you may see
+  `X-QC-Cache` instead; behind LiteSpeed ADC, `X-LSADC-Cache`.
+
+```bash
+# [READ] Check the OLS cache header.
+curl -sSI https://example.com | grep -iE 'x-litespeed-cache|x-qc-cache|x-lsadc-cache'
 ```
 
 If **neither** family is present, page caching is off for that request. Before
@@ -185,16 +229,21 @@ Equivalent UI actions: the site customizer's flush button (one site, or all
 caches), and, in WordPress, the admin bar > Object Cache > Flush Cache, or the
 Redis Object Cache plugin's Flush Cache button.
 
-The cache and its purging are managed by the **GridPane Nginx Helper** plugin (a
-fork of rtCamp's Nginx Helper), auto-configured with the correct caching and
-purge methods via `wp-config.php`, which is why those settings cannot be
-misconfigured in the UI.
+On **OLS**, `gp fix cached {site}` purges LSCache via `wp litespeed-purge all`
+(`lib/gridpane.sh`). Equivalent UI actions: the WP admin bar > LiteSpeed Cache >
+Purge All, or the LSCache plugin's Toolbox > Purge.
+
+On **Nginx**, the cache and its purging are managed by the **GridPane Nginx
+Helper** plugin (a fork of rtCamp's Nginx Helper), auto-configured with the
+correct caching and purge methods via `wp-config.php`, which is why those
+settings cannot be misconfigured in the UI.
 
 ## "Cache isn't working" — common causes
 
 1. **You checked the wrong header.** Redis page caching emits
-   `X-Grid-SRCache-Fetch`, not `X-Grid-Cache`. A missing `X-Grid-Cache` is not
-   proof the site is uncached — check both families first.
+   `X-Grid-SRCache-Fetch`, not `X-Grid-Cache`, and OLS emits
+   `X-LiteSpeed-Cache` instead of either. A missing `X-Grid-Cache` is not proof
+   the site is uncached — check the family for your stack.
 2. **You are logged in.** Logged-in requests set `cache-control: private,
    no-store` and are never cached. Test in incognito.
 3. **The page is excluded.** Check GridPane's default cache exclusions and any
@@ -213,6 +262,12 @@ misconfigured in the UI.
    from page caching.
 9. **A CDN in front.** Cloudflare may serve its own cached copy; check Cloudflare
    caching too.
+10. **OLS: the plugin and GridPane toggle disagree.** The customizer writes into
+    the LSCache plugin, but changing the plugin does not change the GridPane
+    toggle; check both.
+11. **OLS: the crawler is saturating the server.** LSCache shares one cache
+    directory across all sites; a high crawl rate on a large site can cause 503s
+    for every site. Lower the crawler settings (see the LSCache KB article).
 
 ## Changing the cache
 
@@ -241,6 +296,18 @@ gp site example.com -redis-object-caching on
 Rollback for each: reverse the toggle (`-cache-off`, or `-redis-object-caching
 off`), or re-enable the previous method and restore its TTL.
 
+On **OLS**, use the customizer's LSCache toggles, or:
+
+```bash
+# [WRITE] OLS: change LSCache page caching (per site). Values: page, page-only,
+# redis, redis-off, php|off. Blast radius: one site. Rollback: set the previous
+# value. Confirm before running.
+gpols site example.com --cache page
+```
+
+Values from `gpols help`. `gpols site` regenerates the vhost and restarts OLS,
+so validate with `gpols test` first.
+
 ## Gotchas
 
 - **Switching page cache method resets the TTL.** When moving from Redis page
@@ -262,5 +329,7 @@ off`), or re-enable the previous method and restore its TTL.
 - Clear all caches (all methods) — https://gridpane.com/kb/how-to-clear-your-website-caches-all-methods/
 - Default cache exclusions — https://gridpane.com/kb/gridpane-default-cache-exclusions/
 - Working with WooCommerce — https://gridpane.com/kb/working-with-woocommerce/
+- OLS Caching and the LiteSpeed Cache Plugin (LSCache) — https://gridpane.com/kb/openlitespeed-ols-caching-and-the-litespeed-cache-plugin-lscache/
+- LSCache for WordPress: verifying cache headers — https://docs.litespeedtech.com/lscache/lscwp/installation/
 
-Last verified: 2026-10-09
+Last verified: 2026-10-19

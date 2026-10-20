@@ -87,9 +87,10 @@ gp wp example.com plugin list --skip-plugins
 
 ## Verify
 
-- Cache: check **both** families — `X-Grid-Cache` (`HIT`/`MISS`/`BYPASS`/`STALE`)
-  for FastCGI or `X-Grid-SRCache-Fetch` (`HIT`/`MISS`/`BYPASS`) for Redis page
-  cache — plus the matching `X-Grid-Cache-TTL` / `X-Grid-SRCache-TTL`.
+- Cache: on Nginx check **both** families — `X-Grid-Cache`
+  (`HIT`/`MISS`/`BYPASS`/`STALE`) for FastCGI or `X-Grid-SRCache-Fetch`
+  (`HIT`/`MISS`/`BYPASS`) for Redis page cache — plus the matching TTL header.
+  On OLS, check `X-LiteSpeed-Cache: hit|miss` instead.
 - Cron: `gp wp {site.url} cron event list`, or the GP-Cron file in
   `/etc/cron.d/gp-cron-{site-with-dashes}`.
 - Debug: read `/var/www/{site.url}/logs/debug.log`, then switch debug back off.

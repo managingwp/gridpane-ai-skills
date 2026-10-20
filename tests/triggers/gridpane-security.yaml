@@ -10,6 +10,8 @@ should_trigger:
   - "fail2ban keeps banning cloudflare ips on gridpane"
   - "restore real visitor IPs behind cloudflare on gridpane"
   - "our gridpane site looks hacked, first steps"
+  - "enable 7g on an openlitespeed site on gridpane"
+  - "whitelist a bot in 7g on openlitespeed on gridpane"
 
 should_not_trigger:
   - "how do I secure a brand new ubuntu server"

@@ -92,6 +92,15 @@ API, so the ban happens at the edge:
 With this in place, one Cloudflare account ban applies across every origin server
 configured the same way.
 
+## OpenLiteSpeed (OLS)
+
+The jails, commands and WP Fail2ban integration are the same on OLS. The
+WordPress jails read `/var/log/php/auth.log` and syslog, not the web-server access
+log, so the OLS log path does not change them. For investigation, OLS logs live
+at `/var/log/ols/ols.{access,error}.log` (server) and
+`/var/www/{site.url}/logs/{site.url}.{access,error}.log` (per site); read them
+with `gpols log {site.url}` (error) or `gpols log httpd`.
+
 ## Gotchas
 
 - **Test from a VPN.** Banning your own office IP (or letting a test ban it) locks
@@ -108,3 +117,5 @@ configured the same way.
 - Configuring Fail2Ban to Prevent Brute Force Attacks — https://gridpane.com/kb/configuring-fail2ban-to-prevent-brute-force-attacks/
 - Using Fail2Ban with Cloudflare — https://gridpane.com/kb/using-fail2ban-with-cloudflare/
 - Useful Commands (manual ban) — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
+
+Last verified: 2026-10-19

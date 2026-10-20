@@ -60,13 +60,18 @@ Standalone tools that are **not** wrappers include `gpupdate` (updater),
 `gpcheck` (health), `gpgit` (git integration) and `gpmonit`/`gpmonitor`
 (monit configuration and notification).
 
+For OpenLiteSpeed, `gpols` is a wrapper for `gp ols` and `ols` wraps
+`/usr/local/lsws/bin/lswsctrl`; the OLS service is `lshttpd`.
+
 ## Versioning and updates
 
 - `usr/local/bin/gridpane.ver` carries `scripts-version:` — the marker the update
   system compares against (`gridpane.ver`).
 - `gp update` execs `/usr/local/bin/gpupdate` (`gp:2469-2471`). `gpupdate`
   sources `lib/gridpane.sh`, `lib/monit.sh`, `lib/update.sh`, `lib/scan.sh` and
-  fetches the packaged scripts/configs for the server's update branch.
+  fetches the packaged scripts/configs for the server's update branch. It
+  **changes state** (fetches, `rsync`s, installs and removes files), so treat it
+  as **[WRITE]**.
 - `gpupdate` takes a **single-instance lock** in `/run/gridpane/gpupdate`
   (tmpfs, root-only `0700`). Modes: a scheduled run skips if another instance
   holds the lock; `daily` waits; `force` waits up to 60s then fails fast

@@ -24,7 +24,7 @@ errors=0
 error() { printf 'LINT: %s\n' "$1" >&2; errors=$(( errors + 1 )); }
 
 # Domains that are allowed to appear (vendors, docs, examples).
-DOMAIN_ALLOWLIST='example\.com|example\.org|example\.net|gridpane\.com|cloudflare\.com|google\.com|googleapis\.com|wordpress\.org|nginx\.org|postman\.com|github\.com|redis\.io|fail2ban\.org|askubuntu\.com|loggly\.com|perishablepress\.com|context7\.com|glama\.ai|managingwp\.io|keepachangelog\.com|semver\.org|editorconfig\.org|documenter\.getpostman\.com|my\.gridpane\.com|status\.gridpane\.com|roadmap\.gridpane\.com'
+DOMAIN_ALLOWLIST='example\.com|example\.org|example\.net|gridpane\.com|cloudflare\.com|google\.com|googleapis\.com|wordpress\.org|nginx\.org|postman\.com|github\.com|redis\.io|fail2ban\.org|askubuntu\.com|loggly\.com|perishablepress\.com|context7\.com|glama\.ai|managingwp\.io|keepachangelog\.com|semver\.org|editorconfig\.org|documenter\.getpostman\.com|documenter\.gw\.postman\.com|my\.gridpane\.com|status\.gridpane\.com|roadmap\.gridpane\.com|core-api\.upvotyfeedback\.com|docs\.litespeedtech\.com'
 
 # ---------------------------------------------------------------------------
 # 1-3. Per-skill checks
@@ -95,14 +95,14 @@ for pat in "${secret_globs[@]}"; do
     while IFS= read -r hit; do
         [[ -z "$hit" ]] && continue
         error "possible secret ($pat): $hit"
-    done < <(grep -rInE --exclude=docs-manifest.json "$pat" "$SKILLS_DIR" 2>/dev/null | grep -v 'BEGIN \[A-Z \]\*PRIVATE KEY' || true)
+    done < <(grep -rInE --exclude=docs-manifest.json --exclude=changelog-manifest.json "$pat" "$SKILLS_DIR" 2>/dev/null | grep -v 'BEGIN \[A-Z \]\*PRIVATE KEY' || true)
 done
 
 # Plaintext credential assignments (password=/secret=/token= with a long value).
 while IFS= read -r hit; do
     [[ -z "$hit" ]] && continue
     error "possible credential assignment: $hit"
-done < <(grep -rInE --exclude=docs-manifest.json '(password|passwd|secret|token|api[_-]?key)["'"'"']?[:=][[:space:]]*["'"'"']?[A-Za-z0-9]{16,}' "$SKILLS_DIR" 2>/dev/null || true)
+done < <(grep -rInE --exclude=docs-manifest.json --exclude=changelog-manifest.json '(password|passwd|secret|token|api[_-]?key)["'"'"']?[:=][[:space:]]*["'"'"']?[A-Za-z0-9]{16,}' "$SKILLS_DIR" 2>/dev/null || true)
 
 # ---------------------------------------------------------------------------
 # 5. Real-looking IPv4 addresses
@@ -115,7 +115,7 @@ while IFS= read -r hit; do
         203.0.113.*|198.51.100.*|192.0.2.*|127.0.0.1|0.0.0.0) ;;   # allowed
         *) error "non-documentation IPv4 address: $hit" ;;
     esac
-done < <(grep -rIohE --exclude=docs-manifest.json '([0-9]{1,3}\.){3}[0-9]{1,3}' "$SKILLS_DIR" 2>/dev/null | sort -u | sed 's/^/ip:/' || true)
+done < <(grep -rIohE --exclude=docs-manifest.json --exclude=changelog-manifest.json '([0-9]{1,3}\.){3}[0-9]{1,3}' "$SKILLS_DIR" 2>/dev/null | sort -u | sed 's/^/ip:/' || true)
 
 # ---------------------------------------------------------------------------
 # 6. Real-looking domains
@@ -126,7 +126,7 @@ while IFS= read -r dom; do
     if ! printf '%s' "$dom" | grep -qE "^(${DOMAIN_ALLOWLIST})$"; then
         error "non-allowlisted domain: $dom"
     fi
-done < <(grep -rIohE --exclude=docs-manifest.json '[A-Za-z0-9][A-Za-z0-9.-]*\.(com|net|org|io|co|dev|cloud|ai)\b' "$SKILLS_DIR" 2>/dev/null \
+done < <(grep -rIohE --exclude=docs-manifest.json --exclude=changelog-manifest.json '[A-Za-z0-9][A-Za-z0-9.-]*\.(com|net|org|io|co|dev|cloud|ai)\b' "$SKILLS_DIR" 2>/dev/null \
             | grep -vE '\.(com|net|org|io|co|dev|cloud|ai)\.' | sort -u || true)
 
 # ---------------------------------------------------------------------------

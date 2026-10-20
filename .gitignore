@@ -20,3 +20,6 @@ out/
 
 tmp/
 /plans
+
+# Playwright MCP workspace artifacts
+.playwright-mcp/

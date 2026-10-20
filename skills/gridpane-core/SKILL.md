@@ -37,6 +37,8 @@ Load the references on demand rather than all at once:
   which keys are secret, and how to read them safely.
 - `references/site-env.md` — the per-site `logs/{site.url}.env`: recorded cache
   method (`cache-type`), PHP/pool, WAF and cron state, and secret keys.
+- `references/ols.md` — the OpenLiteSpeed model: config tree, `gpols` commands,
+  logs, LSCache, security and PHP (LSAPI).
 - `references/gp-conventions.md` — how `gp` commands are shaped, read vs mutate.
 - `references/safety.md` — the protocol and the exact confirmation template.
 - `references/stack-overview.md` — request flow and server model.

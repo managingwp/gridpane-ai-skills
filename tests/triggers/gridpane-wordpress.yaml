@@ -9,6 +9,8 @@ should_trigger:
   - "push staging to live on gridpane"
   - "enable wp_debug safely on example.com"
   - "search replace the domain when migrating a gridpane site"
+  - "is lscache working on my openlitespeed gridpane site"
+  - "purge the litespeed cache for example.com on gridpane"
 
 should_not_trigger:
   - "set up a fresh wordpress on a new ubuntu box"

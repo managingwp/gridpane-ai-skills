@@ -45,13 +45,33 @@ include /var/www/site.url/nginx/*-main-context.conf;
 
 ## OpenLiteSpeed (OLS) configuration
 
+OLS stores its config under `/usr/local/lsws/conf` and generates it with
+`gpols` (see `ols.md`).
+
 | Purpose | Path |
 |---|---|
-| Server config / IP deny list | `/usr/local/lsws/conf/ip_deny.conf` |
-| Web server error log | `/usr/local/lsws/logs/error.log` |
-| Web server stderr log (useful for 503s) | `/usr/local/lsws/logs/stderr.log` |
+| Main server config (managed) | `/usr/local/lsws/conf/httpd_config.conf` |
+| Per-site virtual host (managed, generated) | `/usr/local/lsws/conf/vhosts/{site.url}/vhconf.conf` |
+| Per-site rewrite rules (safe to add) | `/var/www/{site.url}/ols/rewrites.conf` |
+| MIME map | `/usr/local/lsws/conf/mime.properties` |
+| Config backups | `/usr/local/lsws/conf/backup/` |
+| Default self-signed cert | `/usr/local/lsws/conf/cert/_default/` |
+| Basic-auth file | `/usr/local/lsws/conf/.htpasswd` |
+| IP allow/deny list | `/usr/local/lsws/conf/ip_deny.conf` |
 
-Restart OLS and regenerate its config with `gpols httpd`.
+Logs:
+
+| Purpose | Path |
+|---|---|
+| Server access / error | `/usr/local/lsws/logs/access.log`, `error.log` (symlinked to `/var/log/ols/ols.access.log`, `ols.error.log`) |
+| Server stderr (useful for 503s) | `/usr/local/lsws/logs/stderr.log` |
+| Per-site access / error | `/var/www/{site.url}/logs/{site.url}.access.log`, `{site.url}.error.log` |
+| ModSecurity audit | `/var/log/modsec_audit.log`; per site `/var/www/{site.url}/modsec/modsec_audit.log` |
+
+`gpols` regenerates `vhconf.conf` and `httpd_config.conf`; do not hand-edit them.
+`.htaccess` is watched and reloaded automatically, but `rewrites.conf` changes
+need `gpols site {site.url}`. Restart/regenerate with `gpols site {site.url}`
+(site) or `gpols httpd` (server only); validate with `gpols test`.
 
 ## PHP
 
@@ -69,7 +89,9 @@ Example slow-log path for `example.com` on PHP 7.3: `/var/log/example.com73.log.
 |---|---|
 | MySQL/MariaDB data directory | `/var/lib/mysql` |
 | MySQL/MariaDB service and error log | `/var/log/mysql/error.log` |
-| Redis config | `/etc/redis/redis.conf` |
+| MySQL slow query log | `/var/log/mysql/slow.log` (the path GridPane's scripts use, `lib/stack.sh`) |
+| Redis config (single-Redis) | `/etc/redis/redis.conf` |
+| Redis page / object cache config (split) | `/etc/redis/redis-page.conf`, `/etc/redis/redis-object.conf` |
 | Redis log | `/var/log/redis/redis-server.log` |
 
 ## Site logs (per site)
@@ -93,7 +115,8 @@ Under `/var/www/{site.url}/logs/`:
 | Server | Access log | Error log |
 |---|---|---|
 | Nginx | `/var/log/nginx/{site.url}.access.log` | `/var/log/nginx/{site.url}.error.log` |
-| OpenLiteSpeed | `/var/log/ols/{site.url}.access.log` | `/var/log/ols/{site.url}.error.log` |
+| OpenLiteSpeed (per site) | `/var/www/{site.url}/logs/{site.url}.access.log` | `/var/www/{site.url}/logs/{site.url}.error.log` |
+| OpenLiteSpeed (server) | `/var/log/ols/ols.access.log` | `/var/log/ols/ols.error.log` |
 
 ModSecurity events are written to the web server's site **error** log.
 
@@ -158,7 +181,12 @@ file for PHP constants. Copy server-wide includes into
 ## /tmp hardening (Ubuntu 22.04 and later)
 
 GridPane mounts `/tmp` as `noexec` by default so a compromised site cannot run
-binaries from it. `/tmp` is cleared on reboot.
+binaries from it. `/tmp` is cleared on reboot. The exact line GridPane writes to
+`/etc/fstab` (`lib/server.sh:735`) is:
+
+```
+tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777 0 0
+```
 
 ```bash
 # [READ] Check whether /tmp is mounted noexec (look for "noexec").
@@ -179,9 +207,6 @@ gp server -tmp-noexec enable
 
 ## Unverified
 
-- Exact MySQL **slow query** log filename: the logs KB page gives
-  `/var/log/mysql/error.log` for the slow log in one place but shows
-  `cat /var/log/mysql/slow.log` elsewhere. Confirm on a real server before
-  relying on either path. Tracked in `OPEN-QUESTIONS.md`.
-- Whether MariaDB (rather than MySQL) is the default engine on current
-  GridPane stacks, and how that changes `systemctl` unit names.
+- Whether every current stack is Percona (the capture shows Percona; the scripts
+  also detect MariaDB) and the exact `systemctl` unit names on a MariaDB box.
+  The snapshot references `mysql.service` (`lib/services.sh:329`).

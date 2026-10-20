@@ -11,6 +11,7 @@ should_trigger:
   - "how do gridpane monit checks send notifications"
   - "which logs should my gridpane tool write to"
   - "list every top-level gp command from the dispatcher"
+  - "how do I regenerate the openlitespeed config with gpols"
 
 should_not_trigger:
   - "write a bash script to parse a csv file"

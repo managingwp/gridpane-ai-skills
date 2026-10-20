@@ -21,3 +21,4 @@ jobs:
         run: |
           ./tests/scripts/test_gp_api.sh
           ./tests/scripts/test_scrape_docs.sh
+          ./tests/scripts/test_scrape_changelog.sh

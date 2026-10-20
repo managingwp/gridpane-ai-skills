@@ -137,4 +137,4 @@ The umbrella workflow. It routes to the other skills and doesn't duplicate them.
 |---|---|
 | v0.1.0 | Phases 0–2 + `gridpane-gp-cli`, lint and install tooling |
 | v0.2.0 | Remaining Phase 3 + Phase 4 |
-| v0.3.0 | Phase 6 evals complete, open questions resolved |
+| v0.3.0 | Phase 6 evals complete, open questions resolved, full OpenLiteSpeed parity |

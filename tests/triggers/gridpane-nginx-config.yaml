@@ -7,9 +7,13 @@ should_trigger:
   - "how do I add a custom response header in nginx on gridpane"
   - "where do I put custom nginx config so gridpane doesn't overwrite it"
   - "redirect one path on example.com with nginx"
+  - "add a custom header to an openlitespeed site on gridpane"
+  - "where do I put custom openlitespeed rewrite rules on gridpane"
+  - "allow an IP on openlitespeed on our gridpane server"
 
 should_not_trigger:
   - "the server is out of disk space, find out why"
   - "clear the cache for example.com"
   - "set up nginx on a fresh ubuntu box"
   - "how do I tune php-fpm max_children"
+  - "install openlitespeed on a fresh ubuntu box"

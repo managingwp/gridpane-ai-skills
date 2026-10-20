@@ -16,6 +16,7 @@ Areas seen in the KB:
 | `gp site` | A single site, or `all-sites` | `gp site example.com -suspend` |
 | `gp stack` | A server-level stack component | `gp stack nginx worker -connections 4096` |
 | `gp ngx` | The Nginx service | `gp ngx -reload` |
+| `gp ols` / `gpols` | OpenLiteSpeed config and service | `gpols site example.com` |
 | `gp php` | A PHP-FPM service for a version | `gp php 8.1 -restart` |
 | `gp mysql` | MySQL/MariaDB service | `gp mysql -restart` |
 | `gp redis` | Redis service | `gp redis -status` |
@@ -41,13 +42,16 @@ gp stack --help
 Also useful for orientation:
 
 ```bash
-# [READ] Make sure the GridPane scripts are current before relying on them.
+# [WRITE] Refresh GridPane's own scripts. Blast radius: whole server (it
+# replaces /usr/local/bin and applies config updates). Rollback: re-run after
+# pinning to the previous version; there is no per-file undo. Confirm first.
 gpupdate
 ```
 
-`gpupdate` refreshes GridPane's own scripts. Treat it as [WRITE] if it is offered
-as a flag that changes state; as a plain refresh it is effectively read-only for
-your site data, but confirm with `gpupdate --help` first.
+`gpupdate` refreshes GridPane's own scripts **and changes state**: it fetches the
+packaged scripts/configs for the update branch, `rsync`s and installs them, and
+removes superseded files (`lib/update.sh`). Treat it as **[WRITE]** under the
+safety protocol, not as a passive refresh.
 
 ## Reading the activity log
 
@@ -85,6 +89,29 @@ and wait for confirmation. Informational commands are [READ] and may run freely.
 - `gp fix cached` **without** a site URL → clears caches for **every site on the
   server**. `gp fix cached {site.url}` scopes it to one site.
 - `gp stack ...` → server-wide: it edits the stack config, not a single site.
+
+## OpenLiteSpeed (`gp ols` / `gpols`)
+
+`gpols` is the wrapper for `gp ols`; `ols` wraps
+`/usr/local/lsws/bin/lswsctrl`. It regenerates OLS config and can restart the
+service, so most commands are [WRITE].
+
+| Label | Command | Scope |
+|---|---|---|
+| [READ] | `gpols get …` | Read a value from a site vhconf/`.env`. |
+| [READ] | `gpols log {site.url\|httpd} [-a] [-f]` | Tail a site or server log. |
+| [READ] | `gpols test`, `gpols build`, `gpols help` | Validate config, show build, help. |
+| [WRITE] | `gpols site {site.url}` | Regenerate one site's vhconf + server config, restart. |
+| [WRITE] | `gpols httpd` | Regenerate server config and restart (whole server). |
+| [WRITE] | `gpols init` / `addon` / `redirect` / `site` / `stats` / `pma` | Generate configs. |
+| [WRITE] | `gpols env …` | Change OLS env values. |
+| [WRITE] | `gpols version …` | Upgrade/downgrade OLS. |
+| [WRITE] | `systemctl restart lsws` | Restart the service (hard). |
+| [DESTRUCTIVE] | `gpols delete …` | Delete pma/stats/domain configs. |
+
+`gpols site` is per site; `gpols httpd`, `gpols init` and `gpols version` are
+server-wide. There is no `gp ngx -reload` equivalent; `gpols httpd` regenerates
+and restarts.
 
 ## Gotchas
 

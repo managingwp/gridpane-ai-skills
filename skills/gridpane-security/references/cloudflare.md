@@ -8,6 +8,25 @@ Behind the proxy, the origin initially sees Cloudflare IPs. GridPane's stack
 automatically translates the real visitor IP coming through Cloudflare, so
 Fail2ban, access logs and rate limiting act on the real client address.
 
+The mechanism:
+
+- Each site vhost includes `/etc/nginx/common/gridpane-realip.conf`, which
+  includes `/etc/nginx/common/*cloudflare-realip.conf`. That file holds
+  `set_real_ip_from <Cloudflare range>;` lines, and Nginx reads the real client
+  from the **`CF-Connecting-IP`** header (KB "Updating Cloudflare Real IPs").
+- GridPane maintains the Cloudflare range list itself and updates it regularly.
+  The deployed scripts stage the ranges at `/opt/gridpane/cf_nginx.ip` (Nginx)
+  and `/opt/gridpane/cf_ols.ip` (OpenLiteSpeed) (`lib/cf.sh:9-26`).
+- On the ModSec reverse-proxy layer (the local `8080` context), Nginx instead
+  trusts the local proxy: `set_real_ip_from 127.0.0.1; real_ip_header
+  X-Forwarded-For; real_ip_recursive on;` (`lib/nginx.sh:920-924`).
+
+On **OLS**, the ranges from `/opt/gridpane/cf_ols.ip` are emitted into the server
+config as trusted entries (`allow ALL, <ranges>T`; `lib/ols/source/httpd.sh`), so
+`gpols httpd` regenerates and restarts OLS. There is no per-site real-IP include
+to edit. `bash /usr/local/bin/lib/cf.sh` refreshes both range files
+(`cf_nginx.ip` / `cf_ols.ip`) if they are missing.
+
 Verify that logs show the visitor IP rather than a Cloudflare IP:
 
 ```bash
@@ -15,8 +34,9 @@ Verify that logs show the visitor IP rather than a Cloudflare IP:
 awk '{print $1}' /var/log/nginx/example.com.access.log | sort | uniq -c | sort -nr | head
 ```
 
-If you must refresh the trusted Cloudflare ranges, GridPane provides a documented
-procedure ("Updating Cloudflare Real IPs") rather than hand-editing Nginx.
+If the ranges are stale, follow GridPane's documented "Updating Cloudflare Real
+IPs" procedure (`/etc/nginx/common/cloudflare-realip.conf`) rather than
+hand-editing Nginx.
 
 ## SSL mode
 

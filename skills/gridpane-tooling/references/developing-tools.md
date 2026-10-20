@@ -46,8 +46,10 @@ them through `gridpane::conf_read` / `gridpane::conf_write` /
   `mysql.env`, `redis*.env`, `monit.env`, `php{version}.env`, `active-sites.env`,
   …) and the per-site file at `/var/www/{site}/logs/{site}.env`
   (`lib/gridpane.sh:1004`),
-- run `chattr -i` on the file before writing — confirming `/root/gridenv` is
-  marked immutable (`lib/gridpane.sh:1059`), and
+- run `chattr -i /root/gridenv/` before reading or writing — GridPane marks the
+  env files `chattr +i` (e.g. `active-sites.env` `lib/site.sh:8071`,
+  `backups.token` `lib/tools.sh:1192`, `mysql.env` `lib/workers.sh:16031`;
+  unlock at `lib/gridpane.sh:836`), and
 - create the file if missing.
 
 A tool that only *reads* should not call `conf_write`; parse the env file
@@ -132,8 +134,6 @@ check that marker rather than assuming.
 - Whether an unrelated custom file placed in `/usr/local/bin` survives a
   `gpupdate` run. `lib/update.sh` uses per-file `cp` plus a hardcoded cleanup
   block, but the exact behaviour is not confirmed; do not rely on it.
-- Whether `/root/gridenv` is always `chattr +i` on every stack. `conf_write` runs
-  `chattr -i` before writing, which strongly implies it.
 - The full payload contract of `gridpane::callback::app` endpoints beyond what
   `monitor::main` uses.
 

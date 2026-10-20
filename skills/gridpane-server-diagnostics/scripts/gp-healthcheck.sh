@@ -3,9 +3,10 @@
 # gp-healthcheck.sh - read-only health snapshot of a GridPane-managed server.
 #
 # Collects: load average, memory and swap, root filesystem disk and inode use,
-# service states, per-pool PHP-FPM worker counts, established MySQL connections,
-# Redis memory use, the GridPane server environment (/root/gridenv) and recent
-# 5xx counts from the web server access logs.
+# service states, per-pool PHP worker counts (PHP-FPM on Nginx; OLS uses LSAPI),
+# established MySQL connections, Redis memory use, the GridPane server
+# environment (/root/gridenv) and recent 5xx counts from the Nginx and OLS
+# access logs.
 #
 # This script only reads. It never changes server state.
 #
@@ -25,9 +26,9 @@ usage() {
 Usage: ${SCRIPT_NAME} [--json] [--site DOMAIN] [--help]
 
 Read-only snapshot of a GridPane server: load, memory/swap, disk and inodes,
-service states, PHP-FPM pool worker counts, MySQL connections, Redis memory, the
-GridPane environment (/root/gridenv) and recent 5xx counts from the web server
-access logs.
+service states, PHP worker counts (PHP-FPM on Nginx; OLS uses LSAPI), MySQL
+connections, Redis memory, the GridPane environment (/root/gridenv) and recent
+5xx counts from the Nginx and OLS access logs.
 
 Options:
   --json          Emit machine-readable JSON to stdout instead of text.
@@ -180,9 +181,9 @@ collect_5xx() {
     # Best effort: field 9 is the status in the standard combined format.
     local pattern site
     if [[ -n "$SITE" ]]; then
-        pattern="/var/log/nginx/${SITE}.access.log /var/log/ols/${SITE}.access.log"
+        pattern="/var/log/nginx/${SITE}.access.log /var/www/${SITE}/logs/${SITE}.access.log"
     else
-        pattern="/var/log/nginx/*access.log /var/log/ols/*access.log"
+        pattern="/var/log/nginx/*access.log /var/log/ols/*access.log /var/www/*/logs/*.access.log"
     fi
     for f in $pattern; do
         [[ -f "$f" ]] || continue
@@ -303,7 +304,11 @@ if [[ -n "$POOL_REPORT" ]]; then
         printf '  %5s  %s\n' "$count" "$pool"
     done <<<"$POOL_REPORT"
 else
-    printf '  (none found)\n'
+    if [[ "$(svc_state lshttpd)" == "active" ]]; then
+        printf '  (OpenLiteSpeed uses LSAPI; PHP-FPM pools do not apply)\n'
+    else
+        printf '  (none found)\n'
+    fi
 fi
 printf '\nMySQL established connections: %s\n' "$MYSQL_CONNS"
 printf 'Redis used memory: %s\n' "${REDIS_MEM:-unavailable}"

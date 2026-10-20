@@ -10,6 +10,7 @@ should_trigger:
   - "the site is stuck in a redirect loop behind cloudflare"
   - "wordpress shows a white screen on gridpane"
   - "the ssl certificate failed to renew on gridpane"
+  - "an openlitespeed site on gridpane is returning 503"
 
 should_not_trigger:
   - "tune php-fpm max_children for better performance across the server"

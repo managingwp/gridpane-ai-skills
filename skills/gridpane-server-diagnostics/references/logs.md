@@ -93,11 +93,31 @@ tail -f /var/log/nginx/"$SITE".error.log
 
 ## OLS equivalents
 
-On OpenLiteSpeed, swap the log paths:
+On OpenLiteSpeed, per-site logs live in `/var/www/{site}/logs/`
+(`{site}.access.log`, `{site}.error.log`); the server logs are
+`/var/log/ols/ols.{access,error}.log` (symlinks to `/usr/local/lsws/logs/`).
 
 ```bash
-# [READ] Top client IPs on an OLS server.
-awk '{print $1}' /var/log/ols/*access.log | sort | uniq -c | sort -nr | head -n 50
+# [READ] Top client IPs on an OLS server (per-site + server logs).
+awk '{print $1}' /var/log/ols/*access.log /var/www/*/logs/*.access.log 2>/dev/null \
+  | sort | uniq -c | sort -nr | head -n 50
+```
+
+```bash
+# [READ] 5xx for one OLS site.
+awk '$9 ~ /^5/ {print $9, $7}' /var/www/"$SITE"/logs/"$SITE".access.log | sort | uniq -c | sort -nr | head -n 20
+```
+
+```bash
+# [READ] IPs hammering wp-login.php / xmlrpc.php on OLS.
+awk '$7 ~ /wp-login/ {print $1}' /var/www/*/logs/*.access.log | sort | uniq -c | sort -nr | head -n 20
+awk '$7 ~ /xmlrpc/   {print $1}' /var/www/*/logs/*.access.log | sort | uniq -c | sort -nr | head -n 20
+```
+
+```bash
+# [READ] OLS logs via gpols (error by default; -a access, -f follow).
+gpols log example.com
+gpols log httpd
 ```
 
 OLS 503s are usually explained by the web server's own logs:
@@ -107,6 +127,9 @@ OLS 503s are usually explained by the web server's own logs:
 grep oops /usr/local/lsws/logs/error.log
 tail -n 100 /usr/local/lsws/logs/stderr.log
 ```
+
+Verify the OLS access-log field layout with `head -1` before trusting the `awk`
+field numbers; it is not guaranteed to match the Nginx combined format.
 
 ## Gotchas
 

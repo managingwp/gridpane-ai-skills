@@ -134,8 +134,12 @@ swap heavily while MySQL holds a large buffer pool is over-committed.
 - Restarting MySQL is server-wide and briefly drops all sites' DB access. Treat
   it as a confirmed [WRITE], not a casual fix.
 - Slow logging adds overhead; leave it off when not debugging.
-- The exact slow-log path is inconsistent in the KB — verify on the server. See
-  `gridpane-core/references/paths.md`.
+- The slow-log path is `/var/log/mysql/slow.log` — the path GridPane's own
+  scripts use (`lib/stack.sh`). The KB page is inconsistent about it; trust the
+  server path above.
+- The engine is Percona on the captured stack; the scripts also detect MariaDB
+  (`lib/services.sh`), and reference `mysql.service`. Confirm on a MariaDB box
+  before quoting unit names.
 
 ## Sources
 

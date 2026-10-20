@@ -1,7 +1,8 @@
 # WAFs: 6G, 7G and ModSecurity
 
 GridPane ships the 6G and 7G web application firewalls and ModSecurity support.
-7G is the newer, recommended ruleset. All are per site.
+7G is the newer, recommended ruleset. All are per site. **6G is Nginx-only**; 7G
+and ModSecurity are available on both Nginx and OpenLiteSpeed.
 
 ## What 7G covers
 
@@ -118,6 +119,49 @@ Rollout and rollback for any whitelist:
 nginx -t && gp ngx -reload
 ```
 
+## OpenLiteSpeed (OLS)
+
+### 7G on OLS
+
+OLS has no 6G; use 7G. Enable it in the Security tab or with
+`gp site {site.url} -7g-on`. The ruleset toggles are the same as Nginx
+(`gp site {site.url} 7g -bad-bots on|off`, etc.).
+
+- **A block is not a 403 on OLS.** The request returns the OLS 7G error page.
+- **Log:** `/var/www/{site.url}/logs/7g.log`, naming the ruleset and rule.
+- **Per-site allow/deny files (safe to add):**
+  `/var/www/{site.url}/ols/7g-{http-referrer,query-strings,remote-host,request-method,request-uri,user-agent}-{allow,deny}.conf`.
+- **Server-wide allow/deny:** `/usr/local/lsws/conf/global/7g-*-{allow,deny}.conf`.
+- **Apply:** after editing, run `gpols site {site.url}`. For server-wide rules,
+  every existing site needs its vhconf regenerated; new sites inherit them.
+- **Validate:** `gpols test` (or `/usr/local/lsws/bin/openlitespeed -t`).
+- `vhconf.conf` holds the compiled 7G config; never edit it directly.
+
+Example whitelist (per site), `/var/www/example.com/ols/7g-user-agent-allow.conf`:
+
+```
+ahrefs
+```
+
+```bash
+# [WRITE] Compile the site's ols/ 7G includes and restart OLS.
+# Blast radius: one site. Rollback: remove the line/file and re-run.
+# Confirm before running.
+gpols site example.com
+```
+
+### ModSecurity on OLS
+
+The same `gp site {site.url} -modsec-on` / `-modsec-off` and
+`-modsec -paranoia-level` commands apply. Paths differ:
+
+- Ruleset: `/usr/local/lsws/modsec` (CRS installed from `/opt/gridpane/modsec`).
+- Per-site config: `/var/www/{site.url}/modsec/{site.url}-main.conf`.
+- Audit log: `/var/log/modsec_audit.log`; per site
+  `/var/www/{site.url}/modsec/modsec_audit.log`.
+
+The default paranoia level is `1` (same as Nginx).
+
 ## Gotchas
 
 - **Never copy 6G rules into 7G configs.** They are incompatible and cause an
@@ -128,13 +172,15 @@ nginx -t && gp ngx -reload
 - **Simplest fix first.** If a one-off action is blocked, toggle the offending
   ruleset off, run the action, toggle it back on, rather than maintaining a
   permanent whitelist.
-- **OLS differs.** The 7G WAF has an OLS variant; the Nginx include paths here do
-  not apply. See the OLS KB article.
+- **OLS differs.** 6G is Nginx-only; OLS uses the 7G OLS variant and ModSec (see
+  "OpenLiteSpeed (OLS)" above). The Nginx include paths here do not apply.
 
 ## Unverified
 
-- The exact ModSecurity ruleset/version and default paranoia level on current
-  stacks. Confirm on the server before quoting defaults.
+- The exact ModSecurity CRS ruleset/version on current stacks. The default
+  paranoia level is `1` (per-site env capture; `lib/waf.sh` reads it from the
+  per-site `modsec/{site}-crs-paranoia-level.conf`). Confirm the ruleset version
+  on the server before quoting it.
 
 ## Sources
 
@@ -142,3 +188,5 @@ nginx -t && gp ngx -reload
 - The 7G WAF and OpenLiteSpeed — https://gridpane.com/kb/the-gridpane-7g-web-application-firewall-and-openlitespeed-ols/
 - Using the GridPane 6G WAF — https://gridpane.com/kb/using-the-gridpane-6g-web-application-firewall/
 - Using the ModSec WAF — https://gridpane.com/kb/using-the-gridpane-modsec-web-application-firewall/
+
+Last verified: 2026-10-19

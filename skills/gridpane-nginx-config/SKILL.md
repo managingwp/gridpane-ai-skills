@@ -23,8 +23,9 @@ Load `gridpane-core` first. Snippets and their rollbacks: `references/snippets.m
 
 - Root (or sudo) over SSH.
 - `gridpane-core` loaded.
-- Confirm the web server: **Nginx** or **OpenLiteSpeed**. This skill's Nginx
-  steps do not apply to OLS.
+- Confirm the web server: **Nginx** or **OpenLiteSpeed**. The workflow is
+  separate (Nginx includes vs the OLS `ols/` files); use the section for your
+  stack.
 - The exact site URL and whether the change is **one site** or **all sites**.
 
 ## Workflow
@@ -32,7 +33,7 @@ Load `gridpane-core` first. Snippets and their rollbacks: `references/snippets.m
 1. **Identify the stack.**
    ```bash
    # [READ] Which web server is running?
-   gp ngx -status || gpols -status
+   gp ngx -status 2>/dev/null || systemctl is-active lshttpd
    ```
 2. **Choose the correct include.** Never edit the managed vhost
    (`/etc/nginx/sites-available/{site.url}`) or `common` files: GridPane
@@ -63,6 +64,50 @@ Load `gridpane-core` first. Snippets and their rollbacks: `references/snippets.m
    ```
 7. **Verify** with a request.
 
+## OpenLiteSpeed workflow
+
+OLS has no Nginx-style includes. Custom config lives in the site's `ols/`
+directory (or `/usr/local/lsws/conf/` for server-wide files) and is compiled into
+`vhconf.conf`/`httpd_config.conf` by `gpols`.
+
+1. **Identify the stack.** `systemctl is-active lshttpd` returns `active` on OLS
+   (and `gp ngx -status` does not).
+2. **Choose the supported file:**
+   - per-site headers: `/var/www/{site.url}/ols/headers.conf`
+   - per-site rewrites: `/var/www/{site.url}/ols/rewrites.conf`
+   - per-site IP allow/deny: `/var/www/{site.url}/ols/ip_allow.conf`,
+     `ip_deny.conf`
+   - server-wide IP allow/deny: `/usr/local/lsws/conf/ip_allow.conf`,
+     `ip_deny.conf`
+
+   Never edit `vhconf.conf` or `httpd_config.conf`; they are generated.
+3. **Back up** the file you will edit (timestamped copy).
+4. **Edit** the file (one rule/header/IP per line).
+5. **Validate.**
+
+   ```bash
+   # [READ] OLS config test. A failure means do NOT regenerate/restart.
+   gpols test
+   ```
+6. **Regenerate and restart.**
+
+   ```bash
+   # [WRITE] Compile the site's ols/ files into its vhconf and restart OLS.
+   # Blast radius: one site. Rollback: restore the .bak copy and re-run.
+   # Confirm before running.
+   gpols site example.com
+   ```
+
+   ```bash
+   # [WRITE] Server-wide: regenerate httpd_config.conf and restart OLS.
+   # Blast radius: every site on the server. Confirm before running.
+   gpols httpd
+   ```
+7. **Verify** with `curl -sSI` (header/redirect), or from an allowed/denied IP.
+
+Server-wide vs per-site: `gpols httpd` affects every site; `gpols site` affects
+one. OLS site-level allow/deny does not override server-level rules.
+
 ## Verify
 
 ```bash
@@ -76,8 +121,14 @@ the new header present, the redirect Location correct).
 ## Rollback
 
 For every snippet: restore the `.bak-<timestamp>` copy (or delete the file you
-created if it is new), run `nginx -t`, then `gp ngx -reload`. Never leave a
-failed config reloaded; a broken Nginx config takes down every site on the box.
+created if it is new), then re-validate and reload.
+
+- **Nginx:** run `nginx -t`, then `gp ngx -reload`.
+- **OLS:** run `gpols test`, then `gpols site {site.url}` (per site) or
+  `gpols httpd` (server-wide).
+
+Never leave a failed config loaded; a broken Nginx config or `httpd_config.conf`
+takes down every site on the box.
 
 ## Gotchas
 
@@ -88,10 +139,11 @@ failed config reloaded; a broken Nginx config takes down every site on the box.
   command, or a more specific match, rather than shadowing GridPane's block.
 - **Server-wide includes have server-wide blast radius.** A syntax error in
   `/etc/nginx/extra.d/` affects **every site**. Always run `nginx -t`.
-- **OpenLiteSpeed differs.** OLS has no Nginx-style includes; it uses its own
-  config (e.g. `/usr/local/lsws/conf/ip_deny.conf`) and `gpols httpd`. See
-  `references/snippets.md` for the OLS notes and `gridpane-security` for OLS IP
-  blocking.
+- **OpenLiteSpeed differs.** No Nginx includes: per-site files live in
+  `/var/www/{site.url}/ols/` (`headers.conf`, `rewrites.conf`, `ip_allow.conf`,
+  `ip_deny.conf`), server-wide IP files in `/usr/local/lsws/conf/`, and `gpols
+  site` / `gpols httpd` regenerate and restart. There is no server-wide custom
+  header and no `limit_req` equivalent. See `references/snippets.md`.
 - **Cache can mask the change.** A custom header or redirect may be served from
   cache. Clear the site cache ([WRITE]) before concluding the rule is wrong.
 
@@ -101,5 +153,8 @@ failed config reloaded; a broken Nginx config takes down every site on the box.
 - Configure Nginx — https://gridpane.com/kb/configure-nginx/
 - Additional Security Measure: Nginx Includes — https://gridpane.com/kb/additional-security-measure-nginx-includes/
 - Useful Commands (ban IPs with Nginx rules) — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
+- How to Add Your Own Custom Headers on OpenLiteSpeed — https://gridpane.com/kb/how-to-add-your-own-custom-headers-on-openlitespeed/
+- How to Create Server-Level Redirects on OpenLiteSpeed (OLS) — https://gridpane.com/kb/how-to-create-server-level-redirects-on-openlitespeed-ols/
+- Allow or Deny IP Addresses on OpenLiteSpeed — https://gridpane.com/kb/allow-or-deny-ip-addresses-on-openlitespeed/
 
-Last verified: 2026-10-07
+Last verified: 2026-10-19

@@ -7,6 +7,7 @@ should_trigger:
   - "what files does gridpane regenerate that I must not edit"
   - "what is the gridpane safety protocol"
   - "where does gridpane store per-site logs"
+  - "how are openlitespeed servers laid out on gridpane"
 
 should_not_trigger:
   - "how do I set up nginx on a fresh ubuntu box"

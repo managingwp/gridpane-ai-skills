@@ -54,8 +54,14 @@ tail -n 50 /var/www/example.com/logs/7g.log
 ```
 
 ```bash
-# [READ] ModSecurity/7G events in the site error log.
+# [READ] ModSecurity/7G events in the Nginx site error log.
 grep -iE 'modsecurity|7g' /var/log/nginx/example.com.error.log | tail -n 30
+```
+
+```bash
+# [READ] OLS: ModSecurity audit log and the site error log.
+tail -n 30 /var/log/modsec_audit.log /var/www/example.com/modsec/modsec_audit.log 2>/dev/null
+tail -n 30 /var/www/example.com/logs/example.com.error.log
 ```
 
 ## Commands
@@ -104,6 +110,9 @@ fail2ban-client set wordpress-extra unbanip 203.0.113.10
   all. Always `nginx -t`.
 - **Never copy 6G rules into 7G configs.** They are not compatible and will cause
   an Nginx syntax failure.
+- **OLS has no 6G.** Use 7G and ModSec; their paths and the per-site
+  `ols/7g-*.conf` allow/deny files differ. Regenerate with `gpols site` /
+  `gpols httpd`, not `gp ngx -reload` (see `references/waf.md`).
 - **Behind Cloudflare, banning the visitor IP at the origin does nothing useful**
   — the traffic still arrives from Cloudflare. Ban at Cloudflare instead (see
   `references/fail2ban.md` and `references/cloudflare.md`).
@@ -123,4 +132,4 @@ fail2ban-client set wordpress-extra unbanip 203.0.113.10
 - Updating Cloudflare Real IPs — https://gridpane.com/kb/updating-cloudflare-real-ips/
 - Introduction to Maldet and ClamAV — https://gridpane.com/kb/an-introduction-to-maldet-and-clamav-malware-scanning/
 
-Last verified: 2026-10-09
+Last verified: 2026-10-19

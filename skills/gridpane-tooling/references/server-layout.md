@@ -19,6 +19,8 @@ domain.
 | `/usr/local/bin/gridpane.ver` | The deployed scripts version marker; the update system compares against it. |
 | `/usr/local/bin/wp` | Bundled WP-CLI (PHP). |
 | `/usr/local/bin/monit`, `/usr/local/bin/duplicacy` | Bundled binaries. |
+| `/usr/local/bin/gpols`, `/usr/local/bin/ols` | OLS config generator (`gp ols`) and the `lswsctrl` wrapper. |
+| `/usr/local/lsws/conf/`, `/usr/local/lsws/logs/` | OpenLiteSpeed config tree and server logs. |
 | `/etc/monit/conf.d/` | Monit service and program definitions (`programs`, `mysql`, `nginx`/`openlitespeed`, `redis`, `fail2ban`, `filesystem`, `system`). |
 | `/etc/monit/monitrc.d/` | Additional monit config (e.g. `fail2ban`). |
 
@@ -59,7 +61,8 @@ the secret keys in `/root/gridenv` and per-site `.env` files.
 | `/var/www/{site.url}/logs/` | Per-site logs (debug, staging, SSL, WAF, cron, …). |
 | `/var/log/monit.log` | Monit checks and service restarts. |
 | `/var/log/nginx/{site.url}.access.log`, `.error.log` | Nginx per-site traffic and errors. |
-| `/var/log/ols/{site.url}.*` | OpenLiteSpeed per-site logs. |
+| `/var/www/{site.url}/logs/{site.url}.access.log`, `.error.log` | OpenLiteSpeed per-site traffic and errors. |
+| `/var/log/ols/ols.{access,error}.log` | OpenLiteSpeed server logs (symlinks to `/usr/local/lsws/logs/`). |
 | `/var/log/mysql/error.log`, `/var/log/mysql/slow.log` | Database errors and slow queries. |
 | `/var/log/php/{version}/fpm.log`, `/var/log/{site.url}{ver}.log.slow` | PHP-FPM service and slow logs. |
 | `/var/log/fail2ban.log`, `/var/log/auth.log` | Brute-force and authentication events. |

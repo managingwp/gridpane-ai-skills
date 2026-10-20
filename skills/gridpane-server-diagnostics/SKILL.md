@@ -47,8 +47,9 @@ scripts/gp-healthcheck.sh --site example.com
 
 - Root (or sudo) over SSH.
 - `gridpane-core` loaded.
-- Know whether the box is Nginx or OpenLiteSpeed; log paths differ. Confirm with
-  `gp ngx -status` (Nginx) or `gpols -status` (OLS).
+- Know whether the box is Nginx or OpenLiteSpeed; log paths and the PHP model
+  differ. Confirm with `gp ngx -status` (Nginx) or
+  `systemctl is-active lshttpd` (OLS).
 
 ## Workflow
 
@@ -59,7 +60,8 @@ not the problem.
 1. **Load and memory.** Is the box out of RAM and swapping?
 2. **Disk and inodes.** A full disk breaks far more than it at first appears.
 3. **Services.** Is something down or being restarted by Monit?
-4. **PHP-FPM pools.** Is one pool saturated on `max_children`?
+4. **PHP workers.** Nginx: is a PHP-FPM pool saturated on `max_children`? OLS:
+   LSAPI has no PHP-FPM pools; check `lshttpd` and its logs.
 5. **Database.** Processlist locks, slow queries, connections, InnoDB buffer.
 6. **Redis.** Is the object/page cache out of memory?
 7. **Web server errors.** What is PHP/Nginx actually complaining about?
@@ -83,6 +85,13 @@ systemctl --no-pager --type=service --state=failed
 ```
 
 ```bash
+# [READ] OLS: service state and logs (skip on Nginx).
+systemctl is-active lshttpd
+gpols log httpd
+tail -n 100 /usr/local/lsws/logs/stderr.log
+```
+
+```bash
 # [READ] What GridPane did recently (often explains an abrupt change).
 tail -n 100 /var/log/gridpane.log
 ```
@@ -97,6 +106,8 @@ resource is clearly exhausted and the timing matches the symptom:
 - **PHP pool** reporting it reached `pm.max_children` → PHP worker starvation.
 - **MySQL** processlist full of `Waiting for table metadata lock` → table locking.
 - **Disk/inodes** near 100% → the classic cause of sudden, wide failures.
+- **OLS:** `lshttpd` inactive/restarting, or `oops`/LSAPI errors in
+  `/usr/local/lsws/logs/error.log` / `stderr.log` → web-server problem.
 
 ## Rollback
 
@@ -115,6 +126,8 @@ must carry its own backup and rollback.
   just been auto-restarted; check `/var/log/monit.log` for recent restarts.
 - **A server-wide symptom is not always server-wide cause.** One runaway site can
   exhaust shared PHP workers, RAM or the database for everyone.
+- **OLS has no PHP-FPM pools.** `php-fpm` pools and logs do not exist there; PHP
+  runs via LSAPI and the web server process is `lshttpd`.
 
 ## Sources
 

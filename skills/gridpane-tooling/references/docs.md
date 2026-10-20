@@ -51,28 +51,56 @@ which pages changed.
 ## Changelog
 
 The GridPane changelog at `https://roadmap.gridpane.com/changelog` is a
-JavaScript single-page app backed by **Upvoty**. `curl` returns only the app
-shell for every path, so a plain fetch cannot capture it. Capturing it needs one
-of:
+JavaScript SPA (Upvoty), but it reads a **public JSON API** — so no browser is
+needed:
 
-- the Upvoty board/API identifier (then query the Upvoty API directly), or
-- an RSS/export from the roadmap, or
-- a headless browser in the scraper to render the SPA.
+- `GET https://core-api.upvotyfeedback.com/public/projects/roadmap.gridpane.com`
+  returns the portal config: `owner`, project `id`, and an `accountSession`
+  access token.
+- `GET {api}/{owner}/projects/{id}/changelog?perPage=N&page=P` with
+  `Authorization: Bearer portal_<accessToken>` returns
+  `{items, total, perPage, page, pages}`.
 
-This is deferred pending the board/API details; tracked in `OPEN-QUESTIONS.md`.
-Do not add a headless-browser dependency until that is agreed.
+`scripts/scrape-changelog.sh` (curl + jq) resolves the portal, pages through the
+API, and writes `references/changelog-manifest.json` — a digest of
+`id`/`title`/`published_at`/`tags` per entry, newest first:
+
+```bash
+# [READ] Build the changelog digest (all pages).
+skills/gridpane-tooling/scripts/scrape-changelog.sh \
+  --out skills/gridpane-tooling/references/changelog-manifest.json
+```
+
+```bash
+# [READ] Offline: build from a saved page fixture (no network).
+skills/gridpane-tooling/scripts/scrape-changelog.sh \
+  --changelog-json fixture-page.json --out /tmp/changelog.json
+```
+
+Notes:
+
+- The digest carries only metadata (title, date, tags, stable entry `id`); the
+  full entry text stays in the source.
+- The SPA exposes **no per-entry deep link** (verified 2026-10-19: navigating to
+  `/changelog/{id}` renders the feedback feed, not the entry). The manifest's
+  `source` is the changelog index; entries are identified by `id`.
+- The API token is per-session and fetched at runtime; it is never stored.
 
 ## Tests
 
-`tests/scripts/test_scrape_docs.sh` runs the scraper `--offline` against a
+`tests/scripts/test_scrape_docs.sh` runs the KB scraper `--offline` against a
 fixture sitemap and cache and asserts the manifest fields, entry count and `/kb/`
-filtering. It never touches the network.
+filtering. `tests/scripts/test_scrape_changelog.sh` runs the changelog scraper
+against a fixture page and asserts fields, dedupe, ordering and `--help`. Neither
+touches the network.
 
 ## Sources
 
-- `skills/gridpane-tooling/scripts/scrape-docs.sh` (implementation).
-- `tests/scripts/test_scrape_docs.sh` (offline test).
+- `skills/gridpane-tooling/scripts/scrape-docs.sh`,
+  `scripts/scrape-changelog.sh` (implementation).
+- `tests/scripts/test_scrape_docs.sh`,
+  `tests/scripts/test_scrape_changelog.sh` (offline tests).
 - GridPane sitemap — https://gridpane.com/sitemap.xml
-- GridPane changelog (Upvoty SPA) — https://roadmap.gridpane.com/changelog
+- GridPane changelog (Upvoty SPA; public JSON API) — https://roadmap.gridpane.com/changelog
 
-Last verified: 2026-10-14
+Last verified: 2026-10-19

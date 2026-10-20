@@ -31,11 +31,14 @@ pass() { printf 'ok: %s\n' "$1"; }
 mkdir -p "$WORK/www"
 printf '{"id":42,"name":"example"}\n' > "$WORK/www/object.json"
 cat > "$WORK/www/servers.json" <<'JSON'
-[{"id":1,"name":"srv-01","ip":"203.0.113.10"}]
+[{"id":1,"label":"srv-01","ip":"203.0.113.10","region":"us-east","sub_id":"do-123","subdomain":"abc.gridpane.example.com","webserver":"nginx","database":"percona"}]
 JSON
 cat > "$WORK/www/sites.json" <<'JSON'
-[{"domain":"example.com","server":"srv-01","php_version":"8.2","stack":"nginx","ssl":"active"}]
+[{"domain":"example.com","server_id":1,"php_version":"8.2","stack":"nginx","ssl":"active"}]
 JSON
+# Default paths resolve with the query string stripped by the mock server.
+cp "$WORK/www/servers.json" "$WORK/www/server"
+cp "$WORK/www/sites.json" "$WORK/www/site"
 
 # --- local mock server ------------------------------------------------------
 
@@ -90,8 +93,18 @@ pass "GET exits 0"
 
 "$GP_INV" --servers-path /servers.json --sites-path /sites.json --out-dir "$WORK/out" >/dev/null 2>&1
 [[ -s "$WORK/out/sites.json" ]] || fail "inventory should write sites.json"
+[[ -s "$WORK/out/servers.csv" ]] || fail "inventory should write servers.csv"
+[[ -s "$WORK/out/sites.csv" ]] || fail "inventory should write sites.csv"
 [[ -s "$WORK/out/inventory.csv" ]] || fail "inventory should write inventory.csv"
 grep -q 'example.com' "$WORK/out/inventory.csv" || fail "inventory.csv should contain the site domain"
-pass "inventory exports JSON and CSV from fixtures"
+grep -q 'srv-01' "$WORK/out/servers.csv" || fail "servers.csv should contain the server label"
+grep -q 'percona' "$WORK/out/servers.csv" || fail "servers.csv should contain the database field"
+pass "inventory exports servers and sites from fixtures"
+
+# The default paths (/server?summary=true, /site) resolve against the mock.
+"$GP_INV" --out-dir "$WORK/out2" >/dev/null 2>&1
+grep -q 'srv-01' "$WORK/out2/servers.csv" || fail "default servers path should resolve"
+grep -q 'example.com' "$WORK/out2/sites.csv" || fail "default sites path should resolve"
+pass "inventory uses the verified default paths"
 
 printf '\nAll API script tests passed.\n'

@@ -58,16 +58,19 @@ Then apply it in a site include:
 location = /wp-login.php {
     limit_req zone=wplogin burst=5 nodelay;
     # let GridPane's own php handling serve the request:
-    include /etc/nginx/common/*-php-context.conf;
+    include /etc/nginx/extra.d/*php-context.conf;
+    include /etc/nginx/extra.d/*-php-context.conf;
 }
 ```
 
 - Rollout: add the zone to `http-context.conf`, the location to the site include,
   `nginx -t`, reload.
 - Rollback: remove both blocks, `nginx -t`, reload.
-- Note: if the location conflicts with GridPane's existing wp-login handling,
-  `nginx -t` fails; use GridPane's documented PHP-context include instead. The
-  exact PHP-include filename should be confirmed on the server (see Unverified).
+- Note: GridPane's PHP `location` includes
+  `/etc/nginx/extra.d/*php-context.conf` and `*-php-context.conf`
+  (`lib/stack.sh:4106-4107`); include the same files so PHP still runs. If the
+  location conflicts with GridPane's existing wp-login handling, `nginx -t`
+  fails; use a different path or the documented PHP-context include instead.
 
 ## Add a custom response header
 
@@ -127,21 +130,76 @@ See `gridpane-wordpress/references/caching.md` and the KB links in Sources.
 
 ---
 
-## OpenLiteSpeed notes
+## OpenLiteSpeed (OLS) snippets
 
-OLS does not use these Nginx includes. Related OLS mechanisms:
+OLS has no Nginx-style includes. Per-site custom config lives in
+`/var/www/{site.url}/ols/` and is compiled into
+`/usr/local/lsws/conf/vhosts/{site.url}/vhconf.conf` by
+`gpols site {site.url}`. Server-wide files live under `/usr/local/lsws/conf/`.
 
-- IP deny list: `/usr/local/lsws/conf/ip_deny.conf`, then `gpols httpd`.
-- OLS server-level redirects and custom headers have their own KB pages.
-- Caching on OLS is LSCache / the LiteSpeed Cache plugin, not FastCGI cache.
+Workflow for every OLS snippet: back up the file, edit it, run `gpols test`,
+then `gpols site {site.url}` (per site) or `gpols httpd` (server-wide). Rollback:
+restore the backup and re-run the same command.
+
+`gp site {site.url} -disable-xmlrpc` works on both stacks; prefer it to a
+hand-written rewrite.
+
+### Custom headers (per site)
+
+File: `/var/www/{site.url}/ols/headers.conf`. One `Name value` per line. There is
+no server-wide custom-header file on OLS — each site must be edited.
+
+```nginx
+X-Example-Header gridpane
+Referrer-Policy strict-origin-when-cross-origin
+```
+
+Rollout: edit the file, `gpols test`, `gpols site {site.url}`. Rollback: restore
+the `.bak` copy and re-run. Verify with
+`curl -sSI https://example.com | grep -i x-example-header`.
+
+### Redirects (per site)
+
+File: `/var/www/{site.url}/ols/rewrites.conf`. `RewriteEngine On` is not needed;
+one rule per line.
+
+```apache
+RewriteRule ^/?old-page$ new-page [L,R=301]
+RewriteRule ^/?old-page/(.*)$ new-page/$1 [L,R=301]
+RewriteCond %{HTTP_HOST} ^old\.example [NC]
+RewriteRule ^(.*)$ https://new.example/$1 [L,R=301,NC]
+```
+
+Rollout: edit, `gpols test`, `gpols site {site.url}`. Rollback: restore the
+backup and re-run. Verify with `curl -sSI`.
+
+### IP allow / deny
+
+Server-wide: `/usr/local/lsws/conf/ip_allow.conf`, `ip_deny.conf`.
+Per site: `/var/www/{site.url}/ols/ip_allow.conf`, `ip_deny.conf`.
+One IP or subnet per line. Server-level deny closes the connection; site-level
+deny returns 403. Site rules do not override server rules.
+
+Rollout: edit, `gpols test`, then `gpols httpd` (server) or
+`gpols site {site.url}` (site). Rollback: restore the backup and re-run. Verify
+from an allowed and a denied address.
+
+### Not available on OLS
+
+- **Nginx `limit_req` / `limit_req_zone` rate limiting** has no direct OLS
+  equivalent; use the 7G WAF, Fail2ban, or OLS anti-DDoS controls instead.
+- **Nginx cache-bypass includes** (`*-skip-*-cache-context.conf`) do not apply;
+  exclude pages in the LSCache plugin (`gridpane-wordpress/references/caching.md`).
+- **Server-wide custom headers** are not supported on OLS; edit each site's
+  `headers.conf`.
+- **`location` blocks / `include *-main-context.conf`** are Nginx-only.
 
 ## Unverified
 
-- The exact GridPane PHP-context include filename used inside the PHP `location`
-  (the KB references a `*-php-context.conf` include for PHP-level rules). Confirm
-  on the server before relying on the rate-limit `include` line above.
 - Whether the default GridPane wp-login handling uses an exact-match `location`
   that would collide with the snippet above.
+- OLS rate limiting: whether a supported rewrite/access-control pattern exists
+  (no documented `limit_req` equivalent).
 
 ## Sources
 
@@ -150,3 +208,5 @@ OLS does not use these Nginx includes. Related OLS mechanisms:
 - Additional Security Measure: Nginx Includes — https://gridpane.com/kb/additional-security-measure-nginx-includes/
 - GridPane Default Cache Exclusions — https://gridpane.com/kb/gridpane-default-cache-exclusions/
 - Allow or Deny IP Addresses on OpenLiteSpeed — https://gridpane.com/kb/allow-or-deny-ip-addresses-on-openlitespeed/
+- How to Add Your Own Custom Headers on OpenLiteSpeed — https://gridpane.com/kb/how-to-add-your-own-custom-headers-on-openlitespeed/
+- How to Create Server-Level Redirects on OpenLiteSpeed (OLS) — https://gridpane.com/kb/how-to-create-server-level-redirects-on-openlitespeed-ols/

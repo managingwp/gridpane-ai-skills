@@ -36,12 +36,17 @@ and Redis credentials.
 | `nginx-helper-redis-prefix-hash` | Nginx Helper cache prefix hash | hash |
 | `nginx-helper-redis-password` | **Secret. Never print.** | — |
 
-`cache-type` is the definitive server-side statement of the page cache:
+`cache-type` is the definitive server-side statement of the page cache
+(`lib/site.sh:1410-1418`, `15010-15052`):
 
-- `cache-type:redis` → Redis page cache → the site answers with
-  **`X-Grid-SRCache-Fetch`**, not `X-Grid-Cache`.
-- A FastCGI or off value has not been observed yet; confirm on a real server
-  before relying on the exact strings (tracked in `OPEN-QUESTIONS.md`).
+| Value | Meaning | Expected header |
+|---|---|---|
+| `redis` | Nginx Redis page cache | `X-Grid-SRCache-Fetch` |
+| `fastcgi` | Nginx FastCGI page cache | `X-Grid-Cache` |
+| `off` | Nginx page caching disabled (any other value is coerced to `off`) | neither |
+
+OpenLiteSpeed sites write the LSCache state instead: `redis-page` (page +
+object), `page-only`, `redis-only`, or `off` (`lib/site.sh:15018-15028`).
 
 This is why `caching.md` tells you to check both header families: a
 `cache-type:redis` site looks "uncached" if you only look for `X-Grid-Cache`.
@@ -88,8 +93,6 @@ these before sharing a copy.
 
 ## Unverified
 
-- The exact `cache-type` values for FastCGI and for caching-off (`fastcgi`? `off`?).
-  Only `redis` has been observed (maintainer capture, 2026-10-09).
 - The complete key set: new keys appear as GridPane adds features.
 
 ## Sources

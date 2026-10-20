@@ -88,6 +88,25 @@ here.
 | GridPane sitemap (KB enumeration for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
 | GridPane changelog (Upvoty-backed SPA; capture deferred) | https://roadmap.gridpane.com/changelog | tooling |
 
+## OpenLiteSpeed (`gridpane-core/references/ols.md`)
+
+All checked **2026-10-19**. Snapshot files: `tmp/gpcli/usr/local/bin/gpols`,
+`ols`, `lib/ols/source/*.sh`, `lib/ols/7g/*`,
+`etc/monit/conf.d/openlitespeed`.
+
+| Topic | URL |
+|---|---|
+| Getting Started with GridPane OpenLiteSpeed (OLS) | https://gridpane.com/kb/getting-started-with-openlitespeed-ols/ |
+| OLS Caching and the LiteSpeed Cache Plugin (LSCache) | https://gridpane.com/kb/openlitespeed-ols-caching-and-the-litespeed-cache-plugin-lscache/ |
+| The GridPane 7G WAF and OpenLiteSpeed (OLS) | https://gridpane.com/kb/the-gridpane-7g-web-application-firewall-and-openlitespeed-ols/ |
+| Allow or Deny IP Addresses on OpenLiteSpeed | https://gridpane.com/kb/allow-or-deny-ip-addresses-on-openlitespeed/ |
+| How to Add Your Own Custom Headers on OpenLiteSpeed | https://gridpane.com/kb/how-to-add-your-own-custom-headers-on-openlitespeed/ |
+| How to Create Server-Level Redirects on OpenLiteSpeed (OLS) | https://gridpane.com/kb/how-to-create-server-level-redirects-on-openlitespeed-ols/ |
+| How to Configure OpenLiteSpeed (OLS) Log Retention | https://gridpane.com/kb/how-to-configure-openlitespeed-ols-log-retention/ |
+| Set Custom Expires by Type on OpenLiteSpeed (OLS) | https://gridpane.com/kb/set-custom-expires-by-type-on-openlitespeed-ols/ |
+| Additional Security Measure Whitelisting on OpenLiteSpeed (OLS) | https://gridpane.com/kb/additional-security-measure-whitelisting-on-openlitespeed-ols/ |
+| Country-Specific Redirects with GeoIP on OpenLiteSpeed (OLS) Servers | https://gridpane.com/kb/country-specific-redirects-with-geoip-on-openlitespeed-ols-servers/ |
+
 ## Non-GridPane references
 
 | Topic | URL |

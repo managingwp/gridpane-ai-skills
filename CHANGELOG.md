@@ -7,9 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.3.0 - 2026-10-20
+
+### Changed
+
+- Resolve the snapshot-verifiable items in `OPEN-QUESTIONS.md`: the Nginx
+  PHP-context include (`/etc/nginx/extra.d/*-php-context.conf`), the `/tmp`
+  fstab line, the MySQL slow-log path (`/var/log/mysql/slow.log`), the split
+  Redis config paths, `gpupdate` as [WRITE], the ModSecurity paranoia default,
+  and `/root/gridenv` `chattr +i`.
+- `gridpane-tooling/references/gp-command-reference.md`: add the dispatcher's
+  `gp site` flag set, grouped, and reconcile the KB reference's 117 flags against
+  the dispatcher (all present).
+- `gridpane-security/references/cloudflare.md`: document the verified real-IP
+  chain (`gridpane-realip.conf` → `*cloudflare-realip.conf`, `CF-Connecting-IP`,
+  ranges staged at `/opt/gridpane/cf_*.ip`).
+- `gridpane-tooling/scripts/scrape-changelog.sh` +
+  `references/changelog-manifest.json`: capture the GridPane changelog from its
+  public Upvoty JSON API (curl + jq, no browser), with an offline test; the
+  changelog is no longer deferred.
+- `gridpane-api`: verify the endpoint catalogue and server summary fields from
+  the Postman collection, default `gp-inventory.sh` to `/server?summary=true`
+  and `/site`, and add a `servers.csv` export; update the fixtures and tests.
+- `gridpane-core/references/site-env.md`: resolve the `cache-type` values from
+  the deployed scripts — `redis`/`fastcgi`/`off` for Nginx and
+  `redis-page`/`page-only`/`redis-only`/`off` for OpenLiteSpeed — and note them
+  in `gridpane-wordpress/references/caching.md`.
+- License confirmed as MIT (README wording updated); full OpenLiteSpeed parity
+  accepted as in scope and tracked in the follow-up PGF `20261019-ols-parity`.
+- `gridpane-core/references/ols.md`: the OpenLiteSpeed model — config tree,
+  `gpols` commands, logs, LSCache, security and PHP (LSAPI) — with 10 KB sources
+  recorded and the open items noted in `OPEN-QUESTIONS.md`.
+- `gridpane-core`: treat OLS as a first-class stack — expanded `paths.md` (config
+  tree, per-site vhost/rewrites, logs), `stack-overview.md` (LSAPI, LSCache,
+  `lshttpd`) and `gp-conventions.md` (`gpols` read/write split and scope).
+- `gridpane-nginx-config`: add the OLS configuration workflow and snippets —
+  per-site `ols/headers.conf`, `ols/rewrites.conf`, and IP allow/deny files,
+  with `gpols test`/`gpols site`/`gpols httpd` and rollbacks — and list the
+  Nginx features with no OLS equivalent.
+- `gridpane-wordpress/references/caching.md`: add the OLS/LSCache branch —
+  `X-LiteSpeed-Cache`/`X-LiteSpeed-Cache-Control` verification, the
+  `ols-page-cache`/`ols-redis-cache`/`cache-type` env keys, `wp litespeed-purge`
+  purging, and OLS-specific failure causes.
+- `gridpane-security`: add the OLS security branches — 7G on OLS (error page,
+  `7g.log`, `ols/7g-*.conf` allow/deny, `gpols site`), ModSec paths on OLS,
+  OLS logs for Fail2ban investigations, and the OLS Cloudflare real-IP path
+  (`cf_ols.ip` → `allow ALL, <ranges>T`).
+- `gridpane-server-diagnostics`: OLS-aware diagnostics — `lshttpd` checks, OLS
+  log one-liners, a note that OLS uses LSAPI (no PHP-FPM pools), and
+  `gp-healthcheck.sh` now reads OLS per-site access logs for 5xx counts.
+- `gridpane-tooling`: add the OLS tooling paths (`gpols`/`ols`,
+  `/usr/local/lsws/conf`, OLS logs) to the server layout and architecture.
+- OLS parity wire-up: add OLS prompts to the trigger evals, and update the README
+  skill table and PLAN milestone to reflect full OpenLiteSpeed coverage.
+
+## v0.2.0 - 2026-10-16
+
 ### Added
 
-- `gridpane-tooling` (in progress): the developer view of GridPane servers.
+- `gridpane-tooling`: the developer view of GridPane servers.
   `references/server-layout.md` maps the deployed tooling (`/usr/local/bin/gp`,
   `gp<cmd>` wrappers, `lib/`, `monit-scripts/`, `gridpane.ver`), `/etc/monit`,
   GridPane state and credentials (`/opt/gridpane`, `/root/gridcreds`,

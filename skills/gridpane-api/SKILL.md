@@ -43,10 +43,15 @@ GRIDPANE_API_TOKEN=... skills/gridpane-api/scripts/gp-api.sh GET /backups/integr
 ```
 
 ```bash
-# [READ] Export servers and sites to JSON and CSV. The list endpoints must be
-# supplied (they are not verified in the GridPane KB; see endpoints.md).
+# [READ] Export servers and sites to JSON and CSV. The list endpoints are
+# verified from the API collection and default to /server?summary=true and /site.
+GRIDPANE_API_TOKEN=... skills/gridpane-api/scripts/gp-inventory.sh --out-dir out
+```
+
+```bash
+# [READ] Override the list endpoints if the API changes.
 GRIDPANE_API_TOKEN=... skills/gridpane-api/scripts/gp-inventory.sh \
-  --servers-path /servers --sites-path /sites --out-dir out
+  --servers-path '/server?summary=true' --sites-path /site --out-dir out
 ```
 
 ```bash
@@ -83,8 +88,10 @@ awk -F',' 'NR==1 || $3 ~ /8\.1/' out/inventory.csv
   printed. Do not paste it into a transcript or commit it.
 - **Endpoints are actively developed.** The API docs warn that endpoints evolve;
   re-check the collection when something breaks.
-- **Not all list endpoints are verified.** `gp-inventory.sh` requires the
-  servers/sites paths rather than guessing them.
+- **List endpoints are verified; site response fields are not.** The servers and
+  sites paths come from the API collection, and the server summary fields are
+  documented there, but the site CSV mapping is best-effort until a live response
+  is captured (`references/endpoints.md`).
 - **Rate limits.** The wrapper backs off on HTTP 429; do not loop aggressively.
 - **Tests never touch the live API.** `tests/scripts/` runs against local
   fixtures.
