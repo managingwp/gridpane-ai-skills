@@ -116,6 +116,14 @@ Every [WRITE] command above includes its rollback. General rules:
   `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
   site the queued run backs up nothing and still exits 0. See
   `references/command-reference.md` before relying on either.
+- **A local backup cron can exist while local backups are off.**
+  `-set-backup-schedule` writes the cron when *any* backup type is enabled, so
+  `Remote-Backups:ON` plus `Local-Backups:OFF` still leaves a daily local cron
+  that no-ops on every run. Read `/var/www/{site}/logs/backups.env`, not the
+  cron file.
+- **A spinning backup button needs a manual backup, not a scheduled one.** Only
+  `-local-single-site` / `-remote-single-site` post `/backups/backup`, the call
+  that re-enables the panel. Run one in `tmux`; an SSH drop skips the callback.
 
 ## Sources
 

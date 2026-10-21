@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   observable signature of a skipped local run: about a second, exit 0, and
   `active.backups.monitoring.log` stopping at `Local backups are NOT enabled`
   with no `Done!` line.
+- `gridpane-gp-cli`: added the stuck-backup-spinner runbook — only the manual
+  paths post `/backups/backup`, so a scheduled-form run never re-enables the
+  panel and a manual `-local-single-site` is the fix; the two per-site lock files
+  and what a refusal looks like; the single shared task-spooler slot with its
+  20-minute wait and one-hour stuck thresholds; and the trap that
+  `-set-backup-schedule` writes a cron for a storage whose toggle is off, so a
+  local cron can exist with `Local-Backups:OFF`.
 - `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
   `status` reports how many articles are ingested (the committed manifest),
   cached (the newest snapshot) and extracted, plus the drift between them, the

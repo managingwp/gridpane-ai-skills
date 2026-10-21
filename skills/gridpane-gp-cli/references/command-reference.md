@@ -201,6 +201,56 @@ refreshes the available-backups list so the UI shows the new revision. All of
 these need root, because the Duplicacy password comes from
 `/root/gridcreds/gridpane.uuid`.
 
+### Stuck backup spinner in the panel
+
+The panel re-enables the backup buttons only when the server posts
+`/backups/backup`. In the backup script that call is made from exactly one
+place, `gpbup::callback::manual_backup_status`, so **only a manual backup**
+(`-local-single-site`, `-remote-single-site`) reports completion, on success
+*and* on failure. A scheduled-form run (`-run-single-site` → `-single-site`)
+never posts it, and neither does a manual run that dies before the callback —
+for example a refusal from the legacy PID lockfile, which `exit 1`s early. The
+result is a spinner that never clears.
+
+Fix: run the manual backup in the foreground and let it finish.
+
+```bash
+# [WRITE] Manual local backup: creates the revision and posts the completion
+# callback that clears the spinner. Blast radius: this site only.
+# Rollback: purge the revision if unwanted. Confirm before running.
+# Run it in tmux/screen — an SSH drop skips the callback and the spinner returns.
+gpbup example.com -local-single-site
+```
+
+A completed run logs `Manual Local Backup Success!` and
+`Backup of example.com Done!` in `/var/www/example.com/logs/manual-backups.log`.
+A failed run posts `failed` and still clears the spinner.
+
+Before running, rule out a same-site holder:
+
+- `/run/gridpane/backups/{site}.lock` — the flock held by a live backup; the
+  stamp inside names pid, start time, type and storage. Manual backups do not
+  wait, so a holder means the run is refused and the spinner stays. Do not
+  delete this file: closing the holder's descriptor is what releases it.
+- `/opt/gridpane/backups/{site}-{storage}-{uuid}.pid` — the legacy PID
+  lockfile. A live pid, or any `duplicacy` process for the site, refuses the run.
+
+### A local cron can outlive the toggle
+
+`-set-backup-schedule` writes `/etc/cron.d/backup-{interval}-{storage}-{site}`
+when *any* backup type is enabled for the site, not the one the cron is for. A
+site with `Remote-Backups:ON` and `Local-Backups:OFF` can therefore carry a
+daily local cron whose every run exits 0 without backing anything up. Check
+`/var/www/{site}/logs/backups.env`, not the cron file, when deciding whether
+local backups actually run.
+
+All scheduled runs share one task-spooler slot, so one hung job stalls every
+other site's schedule. Inspect with
+`TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` (a `running` row) and read the task's
+`Output` file directly. The script waits 20 minutes for a holder and treats one
+older than an hour as stuck; killing a hung task releases its flock with the
+process, and the next run cleans up the stale PID file.
+
 ## WP debug, cron, compression, auth, CSP
 
 | Label | Command |
