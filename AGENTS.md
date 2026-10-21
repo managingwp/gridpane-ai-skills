@@ -52,6 +52,15 @@ description: >-                   # ≤ 1024 chars; says WHAT it does and WHEN t
 - Write in the imperative, aimed at the agent ("Check…", "Run…", "Ask the user…").
 - Explain *why* a step matters when it isn't obvious. Agents generalise better from reasons than from bare rules.
 
+### Distribution
+
+`skills/` is the published discovery root: `npx skills add managingwp/gridpane-ai-skills` offers every folder there that contains a `SKILL.md`.
+
+- A new skill is not done until `npx skills add . --list` shows it (`Found N skills`, one more than before).
+- Folders beginning with `_` are scaffolding, not skills: they must keep `metadata.internal: true` so the CLI hides them, and the marker must be removed when the folder is renamed to a real skill. `scripts/lint-skills.sh` enforces both directions.
+- Never rely on a sibling skill being installed. `gridpane-core` is required, but the README and every description must still make sense when it is the only skill present.
+- The CI discovery check pins the `skills` CLI version. Bump it in `.github/workflows/ci.yml` and re-run the README commands when you do.
+
 ### Command labels and the safety protocol
 
 Every shell, `gp`, WP-CLI or API call in a skill must carry one label:

@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Install path: the repository is a `npx skills` package. `npx skills add
+  managingwp/gridpane-ai-skills` installs the nine production skills into an
+  agent (Claude Code, Codex, OpenCode, …), with `update`/`remove`/`list` handled
+  by the CLI; the README leads with it and keeps `scripts/install.sh` as the
+  offline fallback.
+- `skills/_template`: the scaffold now carries `metadata.internal: true`, so the
+  CLI no longer offers it as an installable `gridpane-example` skill.
+  `scripts/lint-skills.sh` requires the marker on `_`-prefixed folders and
+  rejects it on real skills; `scripts/install.sh` reports the number it actually
+  installed.
 - `gridpane-tooling/scripts/scrape-docs.sh` + `references/docs-manifest.json`:
   index the KB from the public WordPress REST feed for the `kb` post type — four
   requests for 387 posts, `X-WP-Total` cross-checked — instead of 387 page

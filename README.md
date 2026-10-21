@@ -30,24 +30,59 @@ Both GridPane web servers are covered: **Nginx** (PHP-FPM, FastCGI/Redis page ca
 
 ## Install
 
-Skills are plain folders. Copy or symlink the ones you want into your agent's skills directory:
+### With `npx skills` (recommended)
+
+The [skills CLI](https://github.com/vercel-labs/skills) downloads the skills, links them into the agents you use, and tracks them for updates:
 
 ```bash
-git clone https://github.com/<org>/gridpane-ai-skills.git
+# Interactive: pick the skills and the agents (Claude Code, Codex, OpenCode, Cursor, ...)
+npx skills add managingwp/gridpane-ai-skills
+
+# Install every GridPane skill for one agent, globally
+npx skills add managingwp/gridpane-ai-skills --skill '*' -a opencode -g
+
+# Non-interactive, project scope
+npx skills add managingwp/gridpane-ai-skills --skill '*' -a claude-code -y
+
+# List what the repository offers without installing
+npx skills add managingwp/gridpane-ai-skills --list
+```
+
+Use `--copy` instead of the default symlinks when your agent does not follow them.
+
+A single-skill install must include `gridpane-core`, because the other skills rely on its paths, `gp` conventions and safety protocol:
+
+```bash
+npx skills add managingwp/gridpane-ai-skills --skill gridpane-core --skill gridpane-incident-triage -a claude-code
+```
+
+Update or remove installed skills later:
+
+```bash
+npx skills update
+npx skills remove gridpane-security
+npx skills list
+```
+
+### Manual install (offline)
+
+Skills are plain folders, so you can clone and copy them yourself. Use `skills/gridpane-*` rather than `skills/*` so the internal scaffold (`skills/_template`) is not copied:
+
+```bash
+git clone https://github.com/managingwp/gridpane-ai-skills.git
 cd gridpane-ai-skills
 
 # Claude Code (user-wide)
-mkdir -p ~/.claude/skills && cp -r skills/* ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -r skills/gridpane-* ~/.claude/skills/
 
 # Claude Code (per-project)
-mkdir -p .claude/skills && cp -r /path/to/gridpane-ai-skills/skills/* .claude/skills/
+mkdir -p .claude/skills && cp -r skills/gridpane-* .claude/skills/
 
 # Agents that read .agents/skills (Codex, OpenCode, Copilot, etc.)
-mkdir -p .agents/skills && cp -r /path/to/gridpane-ai-skills/skills/* .agents/skills/
+mkdir -p .agents/skills && cp -r skills/gridpane-* .agents/skills/
 ```
 
-Or use the installer, which copies (or, with `--link`, symlinks) the skills and
-always includes `gridpane-core`:
+The installer does the same, copying (or, with `--link`, symlinking) the skills and always including `gridpane-core`:
 
 ```bash
 scripts/install.sh --target ~/.claude/skills
@@ -102,7 +137,7 @@ gridpane-ai-skills/
 ├── LICENSE
 ├── CHANGELOG.md
 ├── skills/
-│   ├── _template/          # skeleton for new skills
+│   ├── _template/          # internal skeleton, hidden from npx skills
 │   ├── gridpane-core/
 │   │   ├── SKILL.md
 │   │   └── references/     # paths.md, gp-conventions.md, safety.md, sources.md, stack-overview.md
