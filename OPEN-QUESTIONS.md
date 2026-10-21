@@ -4,6 +4,13 @@ Items the maintainer needs to decide or confirm. Per [AGENTS.md](AGENTS.md),
 anything that cannot be verified against the GridPane Knowledge Base or
 maintainer-supplied server output is recorded here rather than presented as fact.
 
+Open items are tracked by plans: `20261020-resolve-open-questions` (settleable
+from the `gpcli` snapshot and public docs), `20261020-live-verification` (needs
+capture from a real server), `20261021-backup-restore-skill` (the restore gap),
+`20261021-kb-text-snapshots` (the cache policy question) and
+`20261021-scope-boundaries` (what stays out of scope). Items marked decided are
+closed.
+
 ## Unverified facts
 
 Facts used in a skill that could not be traced to a source yet. Each entry names

@@ -4,7 +4,7 @@ Agent Skills for operating **GridPane**-managed WordPress servers: diagnosing, t
 
 These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or any tool that supports the open `SKILL.md` format) how a GridPane server is laid out, which commands are safe to run, and how to work through common incidents. The agent gets the same mental model an experienced GridPane operator already has.
 
-> Status: **in development.** See [PLAN.md](PLAN.md) for the build plan and [AGENTS.md](AGENTS.md) for contributor and agent rules.
+> Status: **v0.3.0 released.** See [CHANGELOG.md](CHANGELOG.md) for unreleased work and [AGENTS.md](AGENTS.md) for contributor and agent rules.
 
 ---
 
@@ -157,7 +157,6 @@ GridPane servers are usually live production hosting for paying clients. Every s
 gridpane-ai-skills/
 ├── README.md
 ├── AGENTS.md               # rules for agents/contributors working on this repo
-├── PLAN.md                 # build plan and acceptance criteria
 ├── OPEN-QUESTIONS.md       # unverified facts and scope proposals
 ├── LICENSE
 ├── CHANGELOG.md

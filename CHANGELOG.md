@@ -83,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scrape-docs.sh` dates: the manifest `modified` is now UTC (`modified_gmt`)
   with a new `published` from `date_gmt` and `schema: 2`, because the REST
   `modified` field is site-local (UTC-4). Adds `--probe` (one request returns
+
   the newest `modified_gmt`; the site sends no `Last-Modified`/`ETag`) and
   `--since-last`; search prints UTC dates too.
 - `scrape-docs.sh` snapshots and guards: every live run writes
@@ -99,6 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `gridpane-core/references/sources.md`: document the REST endpoints, the
   manifest schema, search and extraction, and the measured request/payload
   numbers; record the KB text-snapshot policy question in `OPEN-QUESTIONS.md`.
+
+### Removed
+
+- `PLAN.md`: the build plan is complete (58 of 58 items, v0.3.0 tagged), so it is
+  retired rather than left as a stale roadmap. Ongoing work is tracked in the
+  external PGFs under `plans/`; `AGENTS.md` now describes that workflow, and the
+  deliberate scope boundaries it carried are recorded in the
+  `20261021-scope-boundaries` plan.
 
 ## v0.3.0 - 2026-10-20
 

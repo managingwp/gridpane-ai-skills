@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for AI agents (and humans) building and maintaining this repository. Read this file and [PLAN.md](PLAN.md) before making changes.
+Instructions for AI agents (and humans) building and maintaining this repository. Read this file before making changes.
 
 ## Mission
 
@@ -8,7 +8,7 @@ Build a set of high-quality, **accurate** and **safe** Agent Skills for GridPane
 
 ## Ground rules
 
-1. **Follow PLAN.md in order.** Work phase by phase. Tick checkboxes in PLAN.md as you complete items, and commit after each completed item or small group of items.
+1. **Work from the plans.** Feature work is tracked in phased Plan Generation Files under `plans/`, which is an external, gitignored hub directory (commit plan changes with `pgf commit gridpane-ai-skills`, never `git add`). Work phase by phase, tick tasks as you complete them, and commit after each completed item or small group of items. Small fixes go in `plans/todos.md`.
 2. **Never invent GridPane specifics.** Paths, `gp` command syntax, API endpoints, config filenames and service names must come from a source:
    - the official GridPane Knowledge Base (`gridpane.com/kb/`) or API docs, or
    - output captured from a real GridPane server and supplied by the maintainer.
@@ -84,7 +84,7 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 ## Repository tooling
 
 - `scripts/lint-skills.sh` validates frontmatter (name matches folder, description length), checks that every command block carries a label, checks for broken relative links, and greps for secrets and real-looking IPs or domains.
-- `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see PLAN.md, Phase 6).
+- `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see `tests/triggers/`).
 - Run `scripts/lint-skills.sh` and `shellcheck` before each commit.
 
 ### Refreshing KB facts
@@ -132,4 +132,4 @@ scripts/gridpane-kb-docs.sh refresh
 - [ ] Scripts pass shellcheck and have `--help`
 - [ ] Trigger eval file present, with at least 5 should and 3 should-not prompts
 - [ ] `Last verified` date set
-- [ ] PLAN.md checkbox ticked
+- [ ] PGF task ticked, or a `plans/todos.md` entry for a small fix
