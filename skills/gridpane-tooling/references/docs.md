@@ -112,13 +112,15 @@ skills/gridpane-tooling/scripts/scrape-docs.sh \
 (`-f html -t gfm`) is used when it is on `PATH`; otherwise a built-in awk/sed
 converter drops `script`/`style`/`svg`/`noscript` bodies and turns block tags
 into line breaks. Body markup is Elementor output, so the converter alone keeps
-inline CSS out of the text. Output is
-`out/gridpane-docs-cache/<slug>.md` — never commit it.
+inline CSS out of the text. Output is `<snapshot>/<slug>.md` (for example
+`out/gridpane-docs-cache/2026-10-21/cache-warming-gridpane-sitemap-driven-crawler.md`)
+— never commit it.
 
 ### Politeness and provenance
 
-- Descriptive User-Agent, `--retry 3`, a `--delay` (default 1s) between requests,
-  `--limit` for partial runs, and a page size capped at 100.
+- Descriptive User-Agent, `--retry 3`, a **10 s delay** between live requests
+  (a live run refuses `--delay` below 10; `--allow-fast` exists for fixture
+  runs), `--limit` for partial runs, and a page size capped at 100.
 - `--dry-run` prints the request URL(s) and exits without fetching, so you can
   see what a run would do before it touches the network.
 - `robots.txt` disallows only `/wp-admin/`. The REST responses carry
@@ -126,8 +128,29 @@ inline CSS out of the text. Output is
   prohibition on reading public content.
 - **Only the manifest is committed.** Raw JSON, HTML and extracted text stay in
   the gitignored `out/gridpane-docs-cache/`; no GridPane page text is rehosted.
+- Every live run writes a **dated snapshot**:
+  `out/gridpane-docs-cache/<YYYY-MM-DD>[-N]/` with its `manifest.json`, and
+  `out/gridpane-docs-cache/latest` points at the newest one. An existing
+  snapshot is never written into, and an aborted run leaves its directory
+  without `manifest.json` (later runs ignore it). `--offline` reads the newest
+  snapshot, or the one named by `--snapshot`.
 - Measured 2026-10-21: 387 posts, 107 categories, six requests for a full build,
-  ~1.9 MB per 100-post page with bodies, ~27 KB metadata-only, ~50 s wall.
+  ~1.9 MB per 100-post page with bodies, ~27 KB metadata-only, ~1 min 45 s wall
+  at the 10 s delay.
+
+### Guards
+
+A refresh refuses to produce a bad manifest:
+
+| Guard | Behaviour | Override |
+|---|---|---|
+| Entry count | Aborts when the count is below 90% of the previous snapshot | `--force` |
+| `X-WP-Total` | Aborts when the manifest count disagrees with the API's total | `--partial` |
+| Response shape | Aborts on a non-array JSON body or a body over 8 MB | none |
+| Concurrency | Aborts when another run holds `<cache>/.lock` (`flock`) | none |
+| Delay | Refuses `--delay` below 10 s on a live run | `--allow-fast` (fixtures only) |
+| Snapshots | Never writes into an existing snapshot directory | none |
+
 
 ### Gotchas
 

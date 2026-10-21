@@ -50,10 +50,19 @@
 #   --all                Extract every slug present in the cached API pages
 #   --dry-run            Print the request URL(s) and exit without fetching
 #   --search-json FILE   With --search: read a saved response instead of fetching
-#   --delay SECONDS      Delay between fetches (default 1)
+#   --delay SECONDS      Delay between fetches (default 10; live runs refuse <10)
+#   --snapshot DIR       Read a specific snapshot (default: the newest one)
+#   --allow-fast         Permit --delay below 10 (fixtures only, never a live site)
+#   --force              Accept a >10% drop in entry count vs the last snapshot
+#   --partial            Accept an X-WP-Total mismatch (deliberate partial data)
 #   --offline            Do not fetch; read pages from the cache only
 #   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
 #   -h, --help           Show this help and exit
+#
+# Snapshots: every live run writes to <cache>/<YYYY-MM-DD>[-N]/ (never into an
+# existing snapshot) with its manifest.json, and points <cache>/latest at it. An
+# aborted run leaves its directory without manifest.json, which later runs
+# ignore. --offline reads the newest snapshot.
 #
 # Exit status: 0 on success, 2 on usage error, 1 if the source cannot be read.
 
@@ -68,7 +77,7 @@ CACHE="out/gridpane-docs-cache"
 PAGE_SIZE=100
 SINCE=""
 LIMIT=0
-DELAY=1
+DELAY=10
 OFFLINE=0
 CONVERT=1
 SEARCH=""
@@ -81,6 +90,11 @@ SEARCH_JSON=""
 PROBE=0
 PROBE_JSON=""
 SINCE_LAST=0
+SNAPSHOT_DIR=""
+ALLOW_FAST=0
+FORCE=0
+PARTIAL=0
+RUN_DIR=""
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -114,7 +128,11 @@ Options:
   --all                Extract every slug present in the cached API pages
   --dry-run            Print the request URL(s) and exit without fetching
   --search-json FILE   With --search: read a saved response instead of fetching
-  --delay SECONDS      Delay between fetches (default ${DELAY})
+  --delay SECONDS      Delay between fetches (default ${DELAY}; live runs refuse <10)
+  --snapshot DIR       Read a specific snapshot (default: the newest one)
+  --allow-fast         Permit --delay below 10 (fixtures only, never a live site)
+  --force              Accept a >10% drop in entry count vs the last snapshot
+  --partial            Accept an X-WP-Total mismatch (deliberate partial data)
   --offline            Do not fetch; read pages from the cache only
   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
   -h, --help           Show this help and exit
@@ -190,7 +208,8 @@ cursor_fetched_at() {
 write_cursor() {
     jq -n --arg fetched "$FETCHED" --arg source "$SOURCE" \
         --argjson count "$count" --arg manifest "${OUT:-}" \
-        '{fetched_at: $fetched, source: $source, count: $count, manifest: $manifest}' \
+        --arg snapshot "$(basename "$RUN_DIR")" \
+        '{fetched_at: $fetched, source: $source, count: $count, manifest: $manifest, snapshot: $snapshot}' \
         > "$(cursor_file)"
 }
 
@@ -230,6 +249,91 @@ probe_kb() {
 
     printf '%s\t%s\n' "$modified" "$slug"
     log "probe: $url"
+}
+
+# --- snapshots --------------------------------------------------------------
+
+# Directory to read cached pages from: an explicit --snapshot, the newest dated
+# snapshot that has a manifest.json, or the legacy flat cache.
+read_dir() {
+    local d
+    if [[ -n "$SNAPSHOT_DIR" ]]; then
+        d="$SNAPSHOT_DIR"
+        [[ "$d" = /* ]] || d="$CACHE/$d"
+        [[ -d "$d" ]] || die "snapshot not found: $d"
+        printf '%s' "$d"
+        return 0
+    fi
+    d="$(snapshot_dirs | tail -1)"
+    if [[ -n "$d" && -f "$d/manifest.json" ]]; then
+        printf '%s' "$d"
+        return 0
+    fi
+    if compgen -G "$CACHE/api-page-*.json" >/dev/null \
+        || compgen -G "$CACHE/*.html" >/dev/null; then
+        printf '%s' "$CACHE"
+        return 0
+    fi
+    die "no cached snapshot in $CACHE (run a live index first)"
+}
+
+snapshot_dirs() {
+    find "$CACHE" -maxdepth 1 -type d -name '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*' \
+        2>/dev/null | sort
+}
+
+# A live run always gets a fresh directory: <YYYY-MM-DD>, then -2, -3, … An
+# existing snapshot is never written into.
+new_snapshot_dir() {
+    local base name n=1
+    base="$(date -u +%Y-%m-%d)"
+    name="$base"
+    while [[ -e "$CACHE/$name" ]]; do
+        n=$((n + 1))
+        name="$base-$n"
+    done
+    mkdir "$CACHE/$name" || die "could not create $CACHE/$name"
+    printf '%s' "$CACHE/$name"
+}
+
+# Newest completed snapshot other than the one being built.
+previous_snapshot_dir() {
+    local d last=""
+    while IFS= read -r d; do
+        [[ -n "$d" ]] || continue
+        [[ "$d" == "$RUN_DIR" ]] && continue
+        [[ -f "$d/manifest.json" ]] && last="$d"
+    done < <(snapshot_dirs)
+    printf '%s' "$last"
+}
+
+update_latest() {
+    local name
+    name="$(basename "$RUN_DIR")"
+    rm -f "$CACHE/latest"
+    if ! ln -s "$name" "$CACHE/latest" 2>/dev/null; then
+        printf '%s\n' "$name" > "$CACHE/latest"
+    fi
+}
+
+# Refuse a manifest that shrank by more than 10% against the previous snapshot:
+# a blocked request or a truncated feed looks exactly like that.
+guard_count_drop() {
+    local prev prev_count
+    prev="$(previous_snapshot_dir)"
+    [[ -n "$prev" ]] || return 0
+    prev_count="$(jq -r '.count // 0' "$prev/manifest.json" 2>/dev/null || printf '0')"
+    [[ "$prev_count" -gt 0 ]] || return 0
+    if [[ "$count" -lt $((prev_count * 90 / 100)) ]]; then
+        if [[ "$FORCE" -eq 1 ]]; then
+            log "warning: entry count dropped from $prev_count to $count (--force given)"
+            return 0
+        fi
+        log "error: entry count dropped from $prev_count to $count (below 90% of $(basename "$prev"))"
+        log "       rerun with --force if the drop is real; $(basename "$RUN_DIR") has no manifest"
+        return 1
+    fi
+    return 0
 }
 
 # --- search -----------------------------------------------------------------
@@ -320,18 +424,18 @@ html_to_text() {
     '
 }
 
-# Print one article body from the cache: first the API page caches (exact body,
+# Print one article body from a snapshot: first the API page caches (exact body,
 # no theme chrome), then the sitemap HTML cache.
 read_body() {
-    local slug="$1" f
-    for f in "$CACHE"/api-page-*.json "$CACHE"/api-since-*-page-*.json; do
+    local dir="$1" slug="$2" f
+    for f in "$dir"/api-page-*.json "$dir"/api-since-*-page-*.json; do
         [[ -f "$f" ]] || continue
         if jq -e --arg s "$slug" 'any(.[]; .slug == $s)' < "$f" >/dev/null 2>&1; then
             jq -r --arg s "$slug" '.[] | select(.slug == $s) | .content.rendered' < "$f"
             return 0
         fi
     done
-    for f in "$CACHE"/*_"$(slugify "$slug")".html; do
+    for f in "$dir"/*_"$(slugify "$slug")".html; do
         [[ -f "$f" ]] || continue
         cat "$f"
         return 0
@@ -340,8 +444,8 @@ read_body() {
 }
 
 extract_one() {
-    local slug="$1" body converter
-    if ! body="$(read_body "$slug")"; then
+    local dir="$1" slug="$2" body converter out
+    if ! body="$(read_body "$dir" "$slug")"; then
         log "no cached body for slug: $slug"
         return 1
     fi
@@ -351,7 +455,7 @@ extract_one() {
         converter="pandoc"
         if [[ -z "$body" ]]; then
             log "warning: pandoc produced nothing for $slug; using the fallback"
-            body="$(read_body "$slug" | html_to_text "$FORMAT" | decode_entities)"
+            body="$(read_body "$dir" "$slug" | html_to_text "$FORMAT" | decode_entities)"
             converter="fallback"
         fi
     else
@@ -365,21 +469,24 @@ extract_one() {
         | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
         | cat -s | sed -e '/./,$!d')"
 
-    printf '%s\n' "$body" > "$CACHE/$slug.md"
-    log "wrote $CACHE/$slug.md ($converter, $(wc -c < "$CACHE/$slug.md" | tr -d ' ') bytes)"
+    out="$dir/$slug.md"
+    printf '%s\n' "$body" > "$out"
+    log "wrote $out ($converter, $(wc -c < "$out" | tr -d ' ') bytes)"
 }
 
 extract_slugs() {
+    local dir
+    dir="$(read_dir)"
     if [[ -n "$SLUG" ]]; then
-        extract_one "$SLUG"
+        extract_one "$dir" "$SLUG"
         return
     fi
-    if ! ls "$CACHE"/api-page-*.json >/dev/null 2>&1; then
-        die "--all needs cached API pages; run the index first (no --offline)"
+    if ! compgen -G "$dir/api-page-*.json" >/dev/null; then
+        die "--all needs cached API pages; run the index first"
     fi
-    jq -r '.[].slug' "$CACHE"/api-page-*.json | sort -u | while IFS= read -r s; do
+    jq -r '.[].slug' "$dir"/api-page-*.json | sort -u | while IFS= read -r s; do
         [[ -n "$s" ]] || continue
-        extract_one "$s" || true
+        extract_one "$dir" "$s" || true
     done
 }
 
@@ -400,6 +507,10 @@ while [[ $# -gt 0 ]]; do
         --probe)       PROBE=1; shift ;;
         --probe-json)  PROBE_JSON="${2:?--probe-json needs a value}"; shift 2 ;;
         --since-last)  SINCE_LAST=1; shift ;;
+        --snapshot)    SNAPSHOT_DIR="${2:?--snapshot needs a value}"; shift 2 ;;
+        --allow-fast)  ALLOW_FAST=1; shift ;;
+        --force)       FORCE=1; shift ;;
+        --partial)     PARTIAL=1; shift ;;
         --format)      FORMAT="${2:?--format needs a value}"; shift 2 ;;
         --slug)        SLUG="${2:?--slug needs a value}"; shift 2 ;;
         --all)         EXTRACT_ALL=1; shift ;;
@@ -422,6 +533,15 @@ if [[ "$PAGE_SIZE" -gt 100 ]]; then
 fi
 [[ "$PAGE_SIZE" -gt 0 ]] || die "--page-size must be greater than 0"
 [[ "$LIMIT" =~ ^[0-9]+$ ]] || die "--limit must be a number"
+[[ "$DELAY" =~ ^[0-9]+$ ]] || die "--delay must be a whole number of seconds"
+if [[ "$OFFLINE" -eq 0 && "$ALLOW_FAST" -eq 0 && "$DELAY" -lt 10 ]]; then
+    log "error: --delay must be at least 10s for live runs; --allow-fast is for fixtures only"
+    exit 2
+fi
+if [[ -n "$SNAPSHOT_DIR" && "$OFFLINE" -eq 0 ]]; then
+    log "error: --snapshot is for reading; a live run always creates its own snapshot"
+    exit 2
+fi
 have jq || die "jq is required"
 
 if [[ -n "$PROBE_JSON" && "$PROBE" -eq 0 ]]; then
@@ -532,27 +652,43 @@ fi
 mkdir -p "$CACHE"
 FETCHED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# One live run at a time: two interleaved runs would fight over snapshot names.
+if [[ "$OFFLINE" -eq 0 ]] && have flock; then
+    exec 9>"$CACHE/.lock"
+    if ! flock -n 9; then
+        die "another run holds $CACHE/.lock"
+    fi
+fi
+
+if [[ "$OFFLINE" -eq 1 ]]; then
+    RUN_DIR="$(read_dir)"
+    log "reading snapshot: $RUN_DIR"
+else
+    RUN_DIR="$(new_snapshot_dir)"
+fi
+
 ENTRIES="$(mktemp)"
 ENTARRAY="$(mktemp)"
 CATTMP="$(mktemp)"
 CATMAP="$(mktemp)"
-trap 'rm -f "$ENTRIES" "$ENTARRAY" "$CATTMP" "$CATMAP" "$CACHE"/*.tmp' EXIT
+TMPAGE="$(mktemp)"
+trap 'rm -f "$ENTRIES" "$ENTARRAY" "$CATTMP" "$CATMAP" "$TMPAGE" "$CACHE"/*.tmp' EXIT
 
 # --- api source -------------------------------------------------------------
 
 api_page_file() {
     if [[ -n "$SINCE" ]]; then
-        printf '%s/api-since-%s-page-%s.json' "$CACHE" "$(slugify "$SINCE")" "$1"
+        printf '%s/api-since-%s-page-%s.json' "$RUN_DIR" "$(slugify "$SINCE")" "$1"
     else
-        printf '%s/api-page-%s.json' "$CACHE" "$1"
+        printf '%s/api-page-%s.json' "$RUN_DIR" "$1"
     fi
 }
 
-api_cat_file() { printf '%s/api-kbcategories-%s.json' "$CACHE" "$1"; }
+api_cat_file() { printf '%s/api-kbcategories-%s.json' "$RUN_DIR" "$1"; }
 
 # Load one API page into PAGE_JSON. Returns 1 when the page cannot be read.
 fetch_api_page() {
-    local page="$1" file url hdr total pages
+    local page="$1" file url hdr total pages size
     file="$(api_page_file "$page")"
 
     if [[ "$OFFLINE" -eq 1 ]]; then
@@ -578,6 +714,16 @@ fetch_api_page() {
     [[ -n "$total" ]] && WP_TOTAL="$total"
     [[ -n "$pages" ]] && WP_TOTAL_PAGES="$pages"
     rm -f "$hdr"
+
+    size="$(wc -c < "$file.tmp" | tr -d ' ')"
+    if [[ "$size" -gt $((8 * 1024 * 1024)) ]]; then
+        rm -f "$file.tmp"
+        die "response too large for $url ($size bytes)"
+    fi
+    if ! jq -e 'type == "array"' "$file.tmp" >/dev/null 2>&1; then
+        rm -f "$file.tmp"
+        die "response is not a JSON array: $url"
+    fi
     mv "$file.tmp" "$file"
 
     PAGE_JSON="$(cat "$file")"
@@ -653,7 +799,7 @@ api_index() {
                     | map($cm[(tostring)] // ("term-" + (tostring)))),
                 source: "api",
                 text: (.content.rendered // "")
-              }' <<<"$PAGE_JSON" > "$CACHE/api-page-$$.jsonl"
+              }' <<<"$PAGE_JSON" > "$TMPAGE"
 
         while IFS= read -r rec; do
             [[ -n "$rec" ]] || continue
@@ -664,8 +810,7 @@ api_index() {
                 | .title = $title
                 | .sha256 = $sha
                 | .fetched_at = $fetched' <<<"$rec" >> "$ENTRIES"
-        done < "$CACHE/api-page-$$.jsonl"
-        rm -f "$CACHE/api-page-$$.jsonl"
+        done < "$TMPAGE"
 
         count=$((count + n))
         if [[ "$LIMIT" -gt 0 && "$count" -ge "$LIMIT" ]]; then
@@ -715,7 +860,7 @@ sitemap_index() {
         fi
 
         slug="$(slugify "$url")"
-        htmlfile="$CACHE/$slug.html"
+        htmlfile="$RUN_DIR/$slug.html"
 
         if [[ "$OFFLINE" -eq 1 ]]; then
             if [[ ! -f "$htmlfile" ]]; then
@@ -737,7 +882,7 @@ sitemap_index() {
         sha="$(printf '%s' "$html" | sha256sum | cut -d' ' -f1)"
 
         if [[ "$CONVERT" -eq 1 ]] && have pandoc; then
-            printf '%s' "$html" | pandoc -f html -t gfm -o "$CACHE/$slug.md" 2>/dev/null || true
+            printf '%s' "$html" | pandoc -f html -t gfm -o "$RUN_DIR/$slug.md" 2>/dev/null || true
         fi
 
         printf '{"url":"%s","title":"%s","lastmod":"%s","modified":"","published":"","categories":[],"source":"sitemap","fetched_at":"%s","sha256":"%s"}\n' \
@@ -765,7 +910,11 @@ count="$(jq 'length' "$ENTARRAY")"
 
 if [[ "$SOURCE" == "api" && "$OFFLINE" -eq 0 && "$LIMIT" -eq 0 && -z "$SINCE" \
         && -n "$WP_TOTAL" && "$count" -ne "$WP_TOTAL" ]]; then
-    log "warning: manifest has $count entries but the API reported X-WP-Total: $WP_TOTAL"
+    if [[ "$PARTIAL" -eq 1 ]]; then
+        log "warning: manifest has $count entries but the API reported X-WP-Total: $WP_TOTAL (--partial)"
+    else
+        die "manifest has $count entries but the API reported X-WP-Total: $WP_TOTAL (use --partial to accept a partial dataset)"
+    fi
 fi
 if [[ -n "$WP_TOTAL" ]]; then
     log "API reports X-WP-Total: $WP_TOTAL"
@@ -785,10 +934,19 @@ emit_manifest() {
          + {fetched_at: $fetched, count: $total, entries: $e[0]}'
 }
 
+if [[ "$OFFLINE" -eq 0 ]]; then
+    if ! guard_count_drop; then
+        exit 1
+    fi
+    emit_manifest > "$RUN_DIR/manifest.json"
+    update_latest
+    log "wrote $count entries to $RUN_DIR/manifest.json"
+fi
+
 if [[ -n "$OUT" ]]; then
     emit_manifest > "$OUT"
     log "wrote $count entries to $OUT"
-else
+elif [[ "$OFFLINE" -eq 1 ]]; then
     emit_manifest
     log "wrote $count entries to stdout"
 fi
