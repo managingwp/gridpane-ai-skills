@@ -37,7 +37,7 @@ printf '<html><head><title>Example One</title></head><body>x</body></html>' \
 printf '<html><head><title>Example Two</title></head><body>y</body></html>' \
     > "$WORK/cache/gridpane_com_kb_example_two.html"
 
-"$SCRAPER" --offline --sitemap "$WORK/sitemap.xml" --cache "$WORK/cache" \
+"$SCRAPER" --source sitemap --offline --sitemap "$WORK/sitemap.xml" --cache "$WORK/cache" \
     --out "$WORK/manifest.json" 2>"$WORK/stderr"
 
 MANIFEST="$WORK/manifest.json"
