@@ -94,11 +94,36 @@ Always install `gridpane-core`. The other skills reference it.
 
 ---
 
+## Scripts
+
+Repository tooling, run from a clone:
+
+| Script | What it does |
+|---|---|
+| `scripts/install.sh` | Copy or symlink skills into an agent's skills directory (`--target`, `--link`, `--skills`); always includes `gridpane-core` |
+| `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, secrets, IPs, domains. Run before committing; exits non-zero on a problem |
+| `scripts/refresh-kb-docs.sh` | Refresh the committed KB manifest: probe for changes, index into a dated snapshot (10 s between requests), diff, and publish only where the KB changed. `--check-only` answers "did anything change?" in one request and exits 3 when it did |
+
+Shipped with the skills and used by them:
+
+| Script | Skill | What it does |
+|---|---|---|
+| `gp-healthcheck.sh` | `gridpane-server-diagnostics` | Read-only sweep of load, memory, disk, services and PHP-FPM pools (`--json`, `--site`) |
+| `gp-api.sh` | `gridpane-api` | Thin request wrapper for the GridPane API; token from `GRIDPANE_API_TOKEN` |
+| `gp-inventory.sh` | `gridpane-api` | Server and site inventory export |
+| `scrape-docs.sh` | `gridpane-tooling` | Index, search and extract the GridPane Knowledge Base (WordPress REST feed, sitemap fallback). Maintainer tooling — see `skills/gridpane-tooling/references/docs.md` |
+| `scrape-changelog.sh` | `gridpane-tooling` | Changelog digest from Upvoty's public JSON API |
+
+Every script takes `--help`. `tests/scripts/*.sh` are the offline test suites; they are not part of an install and touch no network (the KB and snapshot cases run against a loopback fixture server).
+
+---
+
 ## Requirements
 
 - SSH access to GridPane servers as **root** (or a sudo user), for server-side skills
 - A GridPane **API token** in `GRIDPANE_API_TOKEN`, for `gridpane-api` only. Never commit it.
-- `bash`, `curl` and `jq` on the machine running API scripts
+- `bash`, `curl` and `jq` on the machine running API and KB scripts
+- `python3` only for the repository test suites
 
 ---
 
@@ -154,11 +179,14 @@ gridpane-ai-skills/
 │   │   └── references/     # caching.md
 │   ├── gridpane-security/
 │   │   └── references/     # waf.md, fail2ban.md, cloudflare.md, compromise-first-response.md
+│   ├── gridpane-tooling/
+│   │   ├── references/     # docs.md, docs-manifest.json, gp-command-reference.md, ...
+│   │   └── scripts/        # scrape-docs.sh, scrape-changelog.sh
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh
-├── scripts/                # install.sh, lint-skills.sh
-└── tests/                  # trigger evals, script tests, scenarios
+├── scripts/                # install.sh, lint-skills.sh, refresh-kb-docs.sh
+└── tests/                  # trigger evals, script tests (test_scrape_docs.sh, ...), scenarios
 ```
 
 ---
