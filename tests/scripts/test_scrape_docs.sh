@@ -76,11 +76,13 @@ ok "manifest envelope and sitemap entry fields"
 cat > "$WORK/cache/api-page-1.json" <<'JSON'
 [
   {"slug": "example-one", "link": "https://gridpane.com/kb/example-one/",
-   "modified": "2026-01-02T03:04:05", "kbcategories": [10, 11],
+   "modified_gmt": "2026-01-02T07:04:05", "date_gmt": "2026-01-01T20:00:00",
+   "kbcategories": [10, 11],
    "title": {"rendered": "Example One"},
    "content": {"rendered": "<style>.tbl { font-size: 12px; }</style><h2>Intro</h2><p>Run <code>sitemap-warm-crawl --concurrency 2</code>.</p>"}},
   {"slug": "example-two", "link": "https://gridpane.com/kb/example-two/",
-   "modified": "2026-02-03T04:05:06", "kbcategories": [10],
+   "modified_gmt": "2026-02-03T08:05:06", "date_gmt": "2026-02-02T21:00:00",
+   "kbcategories": [10],
    "title": {"rendered": "Example Two &#038; Friends"},
    "content": {"rendered": "<p>Second body.</p>"}}
 ]
@@ -92,11 +94,11 @@ JSON
 
 "$SCRAPER" --source api --offline --cache "$WORK/cache" --out "$WORK/api.json" 2>/dev/null
 
-jq -e '.source == "api" and .count == 2 and .base == "https://gridpane.com"' "$WORK/api.json" >/dev/null \
+jq -e '.schema == 2 and .source == "api" and .count == 2 and .base == "https://gridpane.com"' "$WORK/api.json" >/dev/null \
     || fail "api manifest envelope is wrong"
 jq -e '.entries[0] | .categories == ["Server Management", "Caching"]' "$WORK/api.json" >/dev/null \
     || fail "category names were not resolved"
-jq -e '.entries | all(.modified != "" and .sha256 != "" and (has("text") | not))' "$WORK/api.json" >/dev/null \
+jq -e '.entries | all(.modified != "" and .published != "" and .sha256 != "" and (has("text") | not))' "$WORK/api.json" >/dev/null \
     || fail "api entry fields are wrong"
 [[ "$(jq -r '.entries[1].title' "$WORK/api.json")" == "Example Two & Friends" ]] \
     || fail "api title was not entity-decoded"
@@ -118,10 +120,10 @@ ok "dry-run builds the index and search URLs"
 cat > "$WORK/search.json" <<'JSON'
 [
   {"slug": "older-hit", "link": "https://gridpane.com/kb/older-hit/",
-   "modified": "2025-01-01T00:00:00", "kbcategories": [10],
+   "modified_gmt": "2025-01-01T04:00:00", "kbcategories": [10],
    "title": {"rendered": "Older Hit"}},
   {"slug": "newer-hit", "link": "https://gridpane.com/kb/newer-hit/",
-   "modified": "2026-03-01T00:00:00", "kbcategories": [10],
+   "modified_gmt": "2026-03-01T04:00:00", "kbcategories": [10],
    "title": {"rendered": "GridPane&#8217;s Newer Hit"}}
 ]
 JSON

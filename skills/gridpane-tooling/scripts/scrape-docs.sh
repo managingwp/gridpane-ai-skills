@@ -12,9 +12,17 @@
 #   sitemap  Enumerate /kb/ URLs from the sitemap and fetch each page.
 #
 # Both write a JSON manifest of url/title/lastmod/fetched_at/sha256, plus the
-# api-only fields modified/categories and a per-entry source. sha256 is the hash
-# of the fetched artifact: the page HTML for --source sitemap, the post's
-# content.rendered for --source api. It is there to detect change between runs.
+# api-only fields modified/published/categories and a per-entry source. sha256 is
+# the hash of the fetched artifact: the page HTML for --source sitemap, the
+# post's content.rendered for --source api. It is there to detect change between
+# runs.
+#
+# Dates: the REST `date` and `modified` fields are site-local (UTC-4 on
+# gridpane.com) and must not be compared with anything else. The manifest stores
+# `modified` from modified_gmt and `published` from date_gmt, because those UTC
+# values equal the sitemap's lastmod and the page's article:modified_time meta.
+# The site sends no Last-Modified or ETag and answers no 304s, so --probe is the
+# cheap change check.
 #
 # Raw JSON and HTML stay in the (gitignored) cache directory; only the manifest
 # is meant to be committed. No GridPane page text is rehosted: extracted text is
@@ -31,6 +39,9 @@
 #   --cache DIR          Cache directory (default out/gridpane-docs-cache)
 #   --page-size N        API page size, capped at 100 (default 100)
 #   --since DATE         API only: pass modified_after=DATE (incremental refresh)
+#   --since-last         API only: use the last full run's fetched_at as --since
+#   --probe              One request: print the newest modified_gmt and slug
+#   --probe-json FILE    With --probe: read a saved response instead of fetching
 #   --limit N            Only process the first N entries (search: result cap)
 #   --search QUERY       One-request KB lookup: print slug/modified/url/title
 #   --json               With --search: emit the raw result array instead of TSV
@@ -67,6 +78,9 @@ EXTRACT_ALL=0
 FORMAT=""
 DRY_RUN=0
 SEARCH_JSON=""
+PROBE=0
+PROBE_JSON=""
+SINCE_LAST=0
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -89,6 +103,9 @@ Options:
   --cache DIR          Cache directory (default ${CACHE})
   --page-size N        API page size, capped at 100 (default ${PAGE_SIZE})
   --since DATE         API only: pass modified_after=DATE (incremental refresh)
+  --since-last         API only: use the last full run's fetched_at as --since
+  --probe              One request: print the newest modified_gmt and slug
+  --probe-json FILE    With --probe: read a saved response instead of fetching
   --limit N            Only process the first N entries (search: result cap)
   --search QUERY       One-request KB lookup: print slug, modified, url, title
   --json               With --search: emit the raw result array instead of TSV
@@ -150,11 +167,69 @@ decode_entities() {
 api_url() {
     local url
     url="$BASE/wp-json/wp/v2/kb?per_page=$PAGE_SIZE&page=$1"
-    url="$url&_fields=slug,link,modified,title,kbcategories,content"
+    url="$url&_fields=slug,link,modified_gmt,date_gmt,title,kbcategories,content"
     if [[ -n "$SINCE" ]]; then
         url="$url&modified_after=$SINCE"
     fi
     printf '%s' "$url"
+}
+
+# --- probe and cursor -------------------------------------------------------
+
+# Cursor written by the last complete live run. Phase 2 promotes this into the
+# "latest" pointer for dated snapshots.
+cursor_file() { printf '%s/last-run.json' "$CACHE"; }
+
+cursor_fetched_at() {
+    local f
+    f="$(cursor_file)"
+    [[ -f "$f" ]] || die "no previous run recorded in $CACHE (run a full index first)"
+    jq -r '.fetched_at // empty' < "$f"
+}
+
+write_cursor() {
+    jq -n --arg fetched "$FETCHED" --arg source "$SOURCE" \
+        --argjson count "$count" --arg manifest "${OUT:-}" \
+        '{fetched_at: $fetched, source: $source, count: $count, manifest: $manifest}' \
+        > "$(cursor_file)"
+}
+
+# One request that answers "did anything change?". The site sends no
+# Last-Modified or ETag (and no 304s), so this tiny payload is the cheapest
+# available change check.
+probe_url() {
+    printf '%s/wp-json/wp/v2/kb?orderby=modified&order=desc&per_page=1&_fields=slug,modified_gmt' \
+        "$BASE"
+}
+
+probe_kb() {
+    local url json modified slug baseline
+    url="$(probe_url)"
+
+    if [[ -n "$PROBE_JSON" ]]; then
+        [[ -f "$PROBE_JSON" ]] || die "probe fixture not found: $PROBE_JSON"
+        json="$(cat "$PROBE_JSON")"
+    elif ! json="$(curl -fsSL --retry 3 --max-time 30 -A "$UA" "$url")"; then
+        die "probe request failed: $url"
+    fi
+
+    modified="$(jq -r '.[0].modified_gmt // empty' <<<"$json")"
+    slug="$(jq -r '.[0].slug // empty' <<<"$json")"
+    [[ -n "$modified" ]] || die "probe returned no modified_gmt"
+
+    if [[ "$SINCE_LAST" -eq 1 ]]; then
+        baseline="$(cursor_fetched_at)"
+        if [[ "${modified%Z}" > "${baseline%Z}" ]]; then
+            printf '%s\t%s\n' "$modified" "$slug"
+            log "changes since $baseline"
+        else
+            printf 'no changes since %s\n' "$baseline"
+        fi
+        return 0
+    fi
+
+    printf '%s\t%s\n' "$modified" "$slug"
+    log "probe: $url"
 }
 
 # --- search -----------------------------------------------------------------
@@ -171,7 +246,7 @@ search_url() {
     elif [[ "$per" -gt 100 ]]; then
         per=100
     fi
-    printf '%s/wp-json/wp/v2/kb?search=%s&per_page=%s&_fields=slug,link,title,modified,kbcategories' \
+    printf '%s/wp-json/wp/v2/kb?search=%s&per_page=%s&_fields=slug,link,title,modified_gmt,kbcategories' \
         "$BASE" "$enc" "$per"
 }
 
@@ -187,7 +262,7 @@ search_kb() {
     fi
 
     if [[ "$JSON_OUT" -eq 1 ]]; then
-        jq 'sort_by(.modified) | reverse' <<<"$json"
+        jq 'sort_by(.modified_gmt) | reverse' <<<"$json"
         return 0
     fi
 
@@ -200,8 +275,8 @@ search_kb() {
     while IFS=$'\t' read -r slug modified link title; do
         title="$(printf '%s' "$title" | decode_entities)"
         printf '%s\t%s\t%s\t%s\n' "$slug" "$modified" "$link" "$title"
-    done < <(jq -r 'sort_by(.modified) | reverse | .[]
-        | [.slug, .modified, .link, (.title.rendered // "")]
+    done < <(jq -r 'sort_by(.modified_gmt) | reverse | .[]
+        | [.slug, .modified_gmt, .link, (.title.rendered // "")]
         | @tsv' <<<"$json")
 }
 
@@ -322,6 +397,9 @@ while [[ $# -gt 0 ]]; do
         --json)        JSON_OUT=1; shift ;;
         --search-json) SEARCH_JSON="${2:?--search-json needs a value}"; shift 2 ;;
         --dry-run)     DRY_RUN=1; shift ;;
+        --probe)       PROBE=1; shift ;;
+        --probe-json)  PROBE_JSON="${2:?--probe-json needs a value}"; shift 2 ;;
+        --since-last)  SINCE_LAST=1; shift ;;
         --format)      FORMAT="${2:?--format needs a value}"; shift 2 ;;
         --slug)        SLUG="${2:?--slug needs a value}"; shift 2 ;;
         --all)         EXTRACT_ALL=1; shift ;;
@@ -345,6 +423,45 @@ fi
 [[ "$PAGE_SIZE" -gt 0 ]] || die "--page-size must be greater than 0"
 [[ "$LIMIT" =~ ^[0-9]+$ ]] || die "--limit must be a number"
 have jq || die "jq is required"
+
+if [[ -n "$PROBE_JSON" && "$PROBE" -eq 0 ]]; then
+    log "error: --probe-json needs --probe"
+    exit 2
+fi
+
+if [[ "$PROBE" -eq 1 ]]; then
+    if [[ -n "$OUT" ]]; then
+        log "error: --probe cannot be combined with --out"
+        exit 2
+    fi
+    if [[ -n "$SEARCH" ]]; then
+        log "error: --probe cannot be combined with --search"
+        exit 2
+    fi
+    if [[ -n "$SINCE" && "$SINCE_LAST" -eq 1 ]]; then
+        log "error: --since and --since-last are mutually exclusive"
+        exit 2
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf '%s\n' "$(probe_url)"
+        exit 0
+    fi
+    probe_kb
+    exit 0
+fi
+
+if [[ "$SINCE_LAST" -eq 1 ]]; then
+    if [[ "$SOURCE" != "api" ]]; then
+        log "error: --since-last needs --source api"
+        exit 2
+    fi
+    if [[ -n "$SINCE" ]]; then
+        log "error: --since and --since-last are mutually exclusive"
+        exit 2
+    fi
+    SINCE="$(cursor_fetched_at)"
+    log "using modified_after=$SINCE from the last run"
+fi
 
 if [[ -n "$SEARCH_JSON" && -z "$SEARCH" ]]; then
     log "error: --search-json needs --search"
@@ -530,7 +647,8 @@ api_index() {
                 url: .link,
                 title: (.title.rendered // ""),
                 lastmod: "",
-                modified: (.modified // ""),
+                modified: (.modified_gmt // ""),
+                published: (.date_gmt // ""),
                 categories: ((.kbcategories // [])
                     | map($cm[(tostring)] // ("term-" + (tostring)))),
                 source: "api",
@@ -622,7 +740,7 @@ sitemap_index() {
             printf '%s' "$html" | pandoc -f html -t gfm -o "$CACHE/$slug.md" 2>/dev/null || true
         fi
 
-        printf '{"url":"%s","title":"%s","lastmod":"%s","modified":"","categories":[],"source":"sitemap","fetched_at":"%s","sha256":"%s"}\n' \
+        printf '{"url":"%s","title":"%s","lastmod":"%s","modified":"","published":"","categories":[],"source":"sitemap","fetched_at":"%s","sha256":"%s"}\n' \
             "$(json_escape "$url")" "$(json_escape "$title")" "$(json_escape "$lastmod")" \
             "$(json_escape "$FETCHED")" "$(json_escape "$sha")" >> "$ENTRIES"
         count=$((count + 1))
@@ -661,7 +779,7 @@ emit_manifest() {
         --arg since "$SINCE" \
         --argjson total "$count" \
         --slurpfile e "$ENTARRAY" \
-        '{source: $source}
+        '{schema: 2, source: $source}
          + (if $source == "api" then {base: $base} else {} end)
          + (if $since != "" then {since: $since} else {} end)
          + {fetched_at: $fetched, count: $total, entries: $e[0]}'
@@ -673,4 +791,10 @@ if [[ -n "$OUT" ]]; then
 else
     emit_manifest
     log "wrote $count entries to stdout"
+fi
+
+# Advance the cursor only on a complete live api run: a --limit or --since run
+# is partial and must not make --since-last skip posts.
+if [[ "$SOURCE" == "api" && "$OFFLINE" -eq 0 && "$LIMIT" -eq 0 && -z "$SINCE" ]]; then
+    write_cursor
 fi

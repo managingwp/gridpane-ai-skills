@@ -56,14 +56,16 @@ cannot pass silently.
 `changelog-manifest.json`:
 
 ```json
-{"source":"api","base":"https://gridpane.com","fetched_at":"2026-10-21T15:31:02Z","count":387,
+{"schema":2,"source":"api","base":"https://gridpane.com","fetched_at":"2026-10-21T15:31:02Z","count":387,
  "entries":[{"url":"https://gridpane.com/kb/example/","title":"Example","lastmod":"",
-             "modified":"2026-10-07T00:34:33","categories":["Server Caching"],
-             "source":"api","sha256":"…","fetched_at":"2026-10-21T15:31:02Z"}]}
+             "modified":"2026-10-07T04:34:33","published":"2026-10-06T16:42:34",
+             "categories":["Server Caching"],"source":"api","sha256":"…",
+             "fetched_at":"2026-10-21T15:31:02Z"}]}
 ```
 
 | Field | Meaning |
 |---|---|
+| `schema` | Manifest schema version (`2` since dates became UTC) |
 | `source` | `api` or `sitemap` — which path built the manifest |
 | `base` | Site root (api source only) |
 | `since` | The `modified_after` value, when the run was incremental |
@@ -72,7 +74,8 @@ cannot pass silently.
 | `entries[].url` | Canonical KB URL |
 | `entries[].title` | Post title, entities decoded |
 | `entries[].lastmod` | Sitemap `lastmod`; empty for the api source |
-| `entries[].modified` | Post modified time; empty for the sitemap source |
+| `entries[].modified` | Post modified time in UTC (`modified_gmt`); empty for the sitemap source |
+| `entries[].published` | Post published time in UTC (`date_gmt`); empty for the sitemap source |
 | `entries[].categories` | `kbcategories` names, or `term-<id>` when the taxonomy fetch failed |
 | `entries[].source` | Per-entry source (`api` or `sitemap`) |
 | `entries[].sha256` | Hash of the fetched artifact: page HTML (sitemap) or `content.rendered` (api) |
@@ -134,6 +137,9 @@ inline CSS out of the text. Output is
 - **Do not double-unescape.** Bodies arrive entity-encoded with escaped markup
   inside `<pre>` (`&lt;`, `2&gt;&amp;1`). Decode once, and decode `&amp;` last,
   or `&amp;#8217;` turns into a second entity.
+- **REST `modified`/`date` are site-local (UTC-4), not UTC.** Use
+  `modified_gmt`/`date_gmt` — they match the sitemap `lastmod` and the page's
+  `article:modified_time`. The manifest stores only the UTC values.
 - **`X-WP-Total` is the cheap drift check.** One request with `-o /dev/null -D -`
   tells you whether 387 is still the right number, with no crawl.
 
