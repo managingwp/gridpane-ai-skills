@@ -116,6 +116,23 @@ inline CSS out of the text. Output is `<snapshot>/<slug>.md` (for example
 `out/gridpane-docs-cache/2026-10-21/cache-warming-gridpane-sitemap-driven-crawler.md`)
 — never commit it.
 
+### Compare snapshots
+
+```bash
+# [READ] What changed between the two most recent snapshots.
+skills/gridpane-tooling/scripts/scrape-docs.sh --diff
+```
+
+Output is TSV: `status<TAB>url<TAB>old_modified<TAB>new_modified<TAB>title`, one
+line per change, where `status` is `added`, `removed`, `changed` (body hash
+differs) or `title` (title differs, body identical). `--json` emits
+`{prev, curr, added, removed, changed, title_changed, counts}`, and a one-line
+summary goes to stderr. `--diff PREV` compares against a named snapshot
+directory instead of the automatically detected previous one. A change to
+`modified` alone is not reported — a timestamp edit with identical text is not
+worth re-reading an article for. The command is read-only: no network, no
+writes, and it exits 0 even when every entry changed.
+
 ### Politeness and provenance
 
 - Descriptive User-Agent, `--retry 3`, a **10 s delay** between live requests

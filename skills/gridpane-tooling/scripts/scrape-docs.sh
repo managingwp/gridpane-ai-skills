@@ -50,6 +50,7 @@
 #   --all                Extract every slug present in the cached API pages
 #   --dry-run            Print the request URL(s) and exit without fetching
 #   --search-json FILE   With --search: read a saved response instead of fetching
+#   --diff [PREV]        Compare the newest snapshot with the previous one
 #   --delay SECONDS      Delay between fetches (default 10; live runs refuse <10)
 #   --snapshot DIR       Read a specific snapshot (default: the newest one)
 #   --allow-fast         Permit --delay below 10 (fixtures only, never a live site)
@@ -95,6 +96,8 @@ ALLOW_FAST=0
 FORCE=0
 PARTIAL=0
 RUN_DIR=""
+DIFF=0
+DIFF_PREV=""
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -128,6 +131,7 @@ Options:
   --all                Extract every slug present in the cached API pages
   --dry-run            Print the request URL(s) and exit without fetching
   --search-json FILE   With --search: read a saved response instead of fetching
+  --diff [PREV]        Compare the newest snapshot with the previous one
   --delay SECONDS      Delay between fetches (default ${DELAY}; live runs refuse <10)
   --snapshot DIR       Read a specific snapshot (default: the newest one)
   --allow-fast         Permit --delay below 10 (fixtures only, never a live site)
@@ -282,6 +286,16 @@ snapshot_dirs() {
         2>/dev/null | sort
 }
 
+# Snapshots that finished: they have a manifest.json. An aborted run leaves a
+# directory without one, and that must not count as a comparison target.
+completed_snapshot_dirs() {
+    local d
+    while IFS= read -r d; do
+        [[ -n "$d" ]] || continue
+        [[ -f "$d/manifest.json" ]] && printf '%s\n' "$d"
+    done < <(snapshot_dirs)
+}
+
 # A live run always gets a fresh directory: <YYYY-MM-DD>, then -2, -3, … An
 # existing snapshot is never written into.
 new_snapshot_dir() {
@@ -302,9 +316,87 @@ previous_snapshot_dir() {
     while IFS= read -r d; do
         [[ -n "$d" ]] || continue
         [[ "$d" == "$RUN_DIR" ]] && continue
-        [[ -f "$d/manifest.json" ]] && last="$d"
-    done < <(snapshot_dirs)
+        last="$d"
+    done < <(completed_snapshot_dirs)
     printf '%s' "$last"
+}
+
+# --- diff -------------------------------------------------------------------
+
+# Compare two snapshots by url: added, removed, body changed (sha256) and
+# title-only changes. A change to `modified` alone is not reported, because a
+# timestamp edit with identical text is not something to re-read an article for.
+diff_run() {
+    local curr prev json
+
+    if [[ -n "$SNAPSHOT_DIR" ]]; then
+        curr="$SNAPSHOT_DIR"
+        [[ "$curr" = /* ]] || curr="$CACHE/$curr"
+    else
+        curr="$(completed_snapshot_dirs | tail -1)"
+    fi
+    [[ -n "$curr" ]] || die "no completed snapshot in $CACHE"
+    [[ -f "$curr/manifest.json" ]] || die "no manifest.json in $curr"
+
+    if [[ -n "$DIFF_PREV" ]]; then
+        prev="$DIFF_PREV"
+        [[ "$prev" = /* ]] || prev="$CACHE/$prev"
+        [[ -f "$prev/manifest.json" ]] || die "no manifest.json in $prev"
+    else
+        prev="$(completed_snapshot_dirs | grep -v -x -F "$curr" | tail -1 || true)"
+        if [[ -z "$prev" ]]; then
+            log "only one snapshot in $CACHE ($(basename "$curr")); nothing to compare"
+            return 0
+        fi
+    fi
+
+    json="$(jq -n --slurpfile p "$prev/manifest.json" --slurpfile c "$curr/manifest.json" \
+        --arg prev "$(basename "$prev")" --arg curr "$(basename "$curr")" '
+        ($p[0].entries | map({key: .url, value: .}) | from_entries) as $pm
+        | ($c[0].entries | map({key: .url, value: .}) | from_entries) as $cm
+        | ($cm | keys) as $ck
+        | ($pm | keys) as $pk
+        | {
+            prev: $prev,
+            curr: $curr,
+            added: [ $ck[] | select($pm[.] == null)
+                     | {url: ., title: $cm[.].title,
+                        old_modified: "", new_modified: ($cm[.].modified // "")} ],
+            removed: [ $pk[] | select($cm[.] == null)
+                     | {url: ., title: $pm[.].title,
+                        old_modified: ($pm[.].modified // ""), new_modified: ""} ],
+            changed: [ $ck[] | select($pm[.] != null and $pm[.].sha256 != $cm[.].sha256)
+                     | {url: ., title: $cm[.].title,
+                        old_modified: ($pm[.].modified // ""),
+                        new_modified: ($cm[.].modified // "")} ],
+            title_changed: [ $ck[] | select($pm[.] != null and $pm[.].sha256 == $cm[.].sha256
+                     and $pm[.].title != $cm[.].title)
+                     | {url: ., title: $cm[.].title,
+                        old_modified: ($pm[.].modified // ""),
+                        new_modified: ($cm[.].modified // "")} ]
+          }
+        | .added |= sort_by(.url)
+        | .removed |= sort_by(.url)
+        | .changed |= sort_by(.url)
+        | .title_changed |= sort_by(.url)
+        | .counts = {added: (.added | length), removed: (.removed | length),
+                     changed: (.changed | length),
+                     title_changed: (.title_changed | length)}
+        ')"
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        printf '%s\n' "$json"
+    else
+        jq -r '
+            (.added[]         | ["added",   .url, .old_modified, .new_modified, .title]),
+            (.removed[]       | ["removed", .url, .old_modified, .new_modified, .title]),
+            (.changed[]       | ["changed", .url, .old_modified, .new_modified, .title]),
+            (.title_changed[] | ["title",   .url, .old_modified, .new_modified, .title])
+            | @tsv' <<<"$json"
+    fi
+
+    jq -r '"\(.counts.added) added, \(.counts.removed) removed, \(.counts.changed) changed, \(.counts.title_changed) title-only (\(.prev) -> \(.curr))"' \
+        <<<"$json" >&2
 }
 
 update_latest() {
@@ -511,6 +603,12 @@ while [[ $# -gt 0 ]]; do
         --allow-fast)  ALLOW_FAST=1; shift ;;
         --force)       FORCE=1; shift ;;
         --partial)     PARTIAL=1; shift ;;
+        --diff)
+            DIFF=1; shift
+            if [[ $# -gt 0 && "$1" != -* ]]; then
+                DIFF_PREV="$1"; shift
+            fi
+            ;;
         --format)      FORMAT="${2:?--format needs a value}"; shift 2 ;;
         --slug)        SLUG="${2:?--slug needs a value}"; shift 2 ;;
         --all)         EXTRACT_ALL=1; shift ;;
@@ -609,8 +707,8 @@ if [[ -n "$SEARCH" ]]; then
     exit 0
 fi
 
-if [[ "$JSON_OUT" -eq 1 ]]; then
-    log "error: --json needs --search"
+if [[ "$JSON_OUT" -eq 1 && -z "$SEARCH" && "$DIFF" -eq 0 ]]; then
+    log "error: --json needs --search or --diff"
     exit 2
 fi
 
@@ -638,6 +736,15 @@ fi
 if [[ -n "$FORMAT" ]]; then
     log "error: --format needs --slug or --all"
     exit 2
+fi
+
+if [[ "$DIFF" -eq 1 ]]; then
+    if [[ -n "$OUT" ]]; then
+        log "error: --diff writes to stdout; do not combine with --out"
+        exit 2
+    fi
+    diff_run
+    exit 0
 fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
