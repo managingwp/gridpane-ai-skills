@@ -85,8 +85,15 @@ here.
 | GP-CLI Quick Reference | https://gridpane.com/kb/gp-cli-quick-reference/ | tooling |
 | Useful Commands for Managing GridPane Servers | https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/ | tooling |
 | GridPane Logs — locations and meaning | https://gridpane.com/kb/gridpane-logs-how-to-find-them-and-when-to-use-them/ | tooling |
-| GridPane sitemap (KB enumeration for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
-| GridPane changelog (Upvoty-backed SPA; capture deferred) | https://roadmap.gridpane.com/changelog | tooling |
+| GridPane KB REST feed (`kb` post type, 387 posts) | https://gridpane.com/wp-json/wp/v2/kb | tooling |
+| GridPane KB categories (107 terms) | https://gridpane.com/wp-json/wp/v2/kbcategories | tooling |
+| GridPane sitemap (KB enumeration fallback for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
+| GridPane changelog (Upvoty-backed SPA; captured via its public JSON API) | https://roadmap.gridpane.com/changelog | tooling |
+
+The KB REST routes were checked **2026-10-21**: `X-WP-Total: 387`, matching the
+sitemap's 387 `/kb/` URLs, and `robots.txt` disallows only `/wp-admin/`. The
+routes are public today but are not a stability guarantee, which is why the
+sitemap path is kept as `--source sitemap`.
 
 ## OpenLiteSpeed (`gridpane-core/references/ols.md`)
 

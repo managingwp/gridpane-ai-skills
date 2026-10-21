@@ -1,16 +1,29 @@
 # Docs and changelog capture
 
-How the GridPane Knowledge Base is indexed for these skills, and the state of the
-changelog capture.
+How the GridPane Knowledge Base is indexed and queried for these skills, and how
+the changelog is captured.
 
 ## Knowledge Base
 
-`scripts/scrape-docs.sh` is a read-only indexer for the public KB:
+`scripts/scrape-docs.sh` is a read-only indexer and lookup tool for the public
+KB. Two sources; the REST feed is the default.
+
+- **`--source api` (default)** reads the public WordPress REST feed for the `kb`
+  post type: title, slug, link, last-modified time, category terms and the full
+  rendered body. All 387 articles come back in four requests.
+- **`--source sitemap`** enumerates `/kb/` URLs from the sitemap and fetches each
+  page. Kept as a fallback in case the REST route closes.
 
 ```bash
-# [READ] Build the manifest from the live sitemap (default: all /kb/ pages).
+# [READ] Build the manifest from the REST feed (all 387 posts).
 skills/gridpane-tooling/scripts/scrape-docs.sh \
   --out skills/gridpane-tooling/references/docs-manifest.json
+```
+
+```bash
+# [READ] Incremental refresh: only posts modified since a date.
+skills/gridpane-tooling/scripts/scrape-docs.sh --since 2026-10-01T00:00:00 \
+  --out /tmp/kb-since.json
 ```
 
 ```bash
@@ -19,15 +32,56 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --offline \
   --out skills/gridpane-tooling/references/docs-manifest.json
 ```
 
-- Source of truth: `https://gridpane.com/sitemap.xml`, filtered to `/kb/` URLs
-  (387 at the time of writing). `robots.txt` allows it (only `/wp-admin/` is
-  disallowed).
-- The script fetches with a descriptive User-Agent, `--retry 3`, a `--delay`
-  (default 1s) and a `--limit`. Raw HTML and optional Markdown (via `pandoc`)
-  stay in the gitignored cache (`out/gridpane-docs-cache/`); **only the manifest
-  is committed** — no GridPane page text is rehosted.
-- `--offline` reads pages from the cache, so tests and re-runs never hit the
-  network.
+```bash
+# [READ] Fallback path: enumerate /kb/ URLs from the sitemap.
+skills/gridpane-tooling/scripts/scrape-docs.sh --source sitemap --out /tmp/kb.json
+```
+
+### Endpoints
+
+| Request | Returns |
+|---|---|
+| `GET /wp-json/wp/v2/kb?per_page=100&page=N&_fields=slug,link,modified,title,kbcategories,content` | one page of posts with their rendered body |
+| `GET /wp-json/wp/v2/kbcategories?per_page=100&page=N&_fields=id,name` | the 107 category terms, so entries carry names instead of ids |
+| `GET /wp-json/wp/v2/kb?search=QUERY&per_page=N` | relevance-ordered hits for a single lookup |
+| `GET /wp-json/wp/v2/kb?modified_after=DATE&…` | incremental refresh |
+
+The collection response carries `X-WP-Total` and `X-WP-TotalPages`. The script
+logs the total and warns when the entry count disagrees, so a truncated run
+cannot pass silently.
+
+### Manifest schema
+
+`references/docs-manifest.json` is an object, not an array — the same shape as
+`changelog-manifest.json`:
+
+```json
+{"source":"api","base":"https://gridpane.com","fetched_at":"2026-10-21T15:31:02Z","count":387,
+ "entries":[{"url":"https://gridpane.com/kb/example/","title":"Example","lastmod":"",
+             "modified":"2026-10-07T00:34:33","categories":["Server Caching"],
+             "source":"api","sha256":"…","fetched_at":"2026-10-21T15:31:02Z"}]}
+```
+
+| Field | Meaning |
+|---|---|
+| `source` | `api` or `sitemap` — which path built the manifest |
+| `base` | Site root (api source only) |
+| `since` | The `modified_after` value, when the run was incremental |
+| `fetched_at` | UTC time of the run |
+| `count` | Number of entries |
+| `entries[].url` | Canonical KB URL |
+| `entries[].title` | Post title, entities decoded |
+| `entries[].lastmod` | Sitemap `lastmod`; empty for the api source |
+| `entries[].modified` | Post modified time; empty for the sitemap source |
+| `entries[].categories` | `kbcategories` names, or `term-<id>` when the taxonomy fetch failed |
+| `entries[].source` | Per-entry source (`api` or `sitemap`) |
+| `entries[].sha256` | Hash of the fetched artifact: page HTML (sitemap) or `content.rendered` (api) |
+| `entries[].fetched_at` | UTC time the entry was fetched |
+
+Entries are sorted by `url` so diffs stay readable. The `sha256` makes it easy to
+see which pages changed between runs.
+
+### Search
 
 Look up an article without building or reading a manifest — one request against
 the same REST route:
@@ -37,27 +91,48 @@ the same REST route:
 skills/gridpane-tooling/scripts/scrape-docs.sh --search 'fastcgi cache' --limit 5
 ```
 
-`--json` emits the raw result array for `jq`. A query never touches the cache,
-so `--search` refuses `--out` and `--offline`.
+`--json` emits the raw result array for `jq`. `--limit` is the server-side page
+size, so it caps by WordPress relevance before the newest-first sort. A query
+never touches the cache, so `--search` refuses `--out` and `--offline`; an empty
+result logs `no matches` and exits 0.
 
-### Manifest schema
+### Extract text
 
-`references/docs-manifest.json` is a JSON array; one object per `/kb/` page:
-
-```json
-{"url":"https://gridpane.com/kb/example/","title":"Example | GridPane","lastmod":"2026-01-02T03:04:05+00:00","fetched_at":"2026-10-14T11:09:19Z","sha256":"…"}
+```bash
+# [READ] Convert one cached article to text in the gitignored cache.
+skills/gridpane-tooling/scripts/scrape-docs.sh \
+  --slug cache-warming-gridpane-sitemap-driven-crawler --format markdown
 ```
 
-| Field | Meaning |
-|---|---|
-| `url` | Canonical KB page URL |
-| `title` | Page `<title>` |
-| `lastmod` | Sitemap `lastmod` (may be empty) |
-| `fetched_at` | UTC time the page was fetched |
-| `sha256` | SHA-256 of the fetched HTML, to detect change between runs |
+`--all` converts every slug present in the cached API pages. pandoc
+(`-f html -t gfm`) is used when it is on `PATH`; otherwise a built-in awk/sed
+converter drops `script`/`style`/`svg`/`noscript` bodies and turns block tags
+into line breaks. Body markup is Elementor output, so the converter alone keeps
+inline CSS out of the text. Output is
+`out/gridpane-docs-cache/<slug>.md` — never commit it.
 
-Refresh on demand and update `Last verified`; the `sha256` makes it easy to see
-which pages changed.
+### Politeness and provenance
+
+- Descriptive User-Agent, `--retry 3`, a `--delay` (default 1s) between requests,
+  `--limit` for partial runs, and a page size capped at 100.
+- `robots.txt` disallows only `/wp-admin/`. The REST responses carry
+  `X-Robots-Tag: noindex`, which is the site's search-indexing preference, not a
+  prohibition on reading public content.
+- **Only the manifest is committed.** Raw JSON, HTML and extracted text stay in
+  the gitignored `out/gridpane-docs-cache/`; no GridPane page text is rehosted.
+- Measured 2026-10-21: 387 posts, 107 categories, six requests for a full build,
+  ~1.9 MB per 100-post page with bodies, ~27 KB metadata-only, ~50 s wall.
+
+### Gotchas
+
+- **The REST route is public today, not contractual.** If `--source api` starts
+  returning 401 or 404, fall back to `--source sitemap` and record the change in
+  the repo's `OPEN-QUESTIONS.md` rather than patching around it.
+- **Do not double-unescape.** Bodies arrive entity-encoded with escaped markup
+  inside `<pre>` (`&lt;`, `2&gt;&amp;1`). Decode once, and decode `&amp;` last,
+  or `&amp;#8217;` turns into a second entity.
+- **`X-WP-Total` is the cheap drift check.** One request with `-o /dev/null -D -`
+  tells you whether 387 is still the right number, with no crawl.
 
 ## Changelog
 
@@ -111,7 +186,12 @@ touches the network.
   `scripts/scrape-changelog.sh` (implementation).
 - `tests/scripts/test_scrape_docs.sh`,
   `tests/scripts/test_scrape_changelog.sh` (offline tests).
+- GridPane KB REST feed — https://gridpane.com/wp-json/wp/v2/kb
+  (checked 2026-10-21: `X-WP-Total: 387`, which matches the sitemap's 387 `/kb/`
+  URLs).
+- GridPane KB categories — https://gridpane.com/wp-json/wp/v2/kbcategories
+  (checked 2026-10-21: 107 terms).
 - GridPane sitemap — https://gridpane.com/sitemap.xml
 - GridPane changelog (Upvoty SPA; public JSON API) — https://roadmap.gridpane.com/changelog
 
-Last verified: 2026-10-19
+Last verified: 2026-10-21

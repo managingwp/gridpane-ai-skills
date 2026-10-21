@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- `gridpane-tooling/scripts/scrape-docs.sh --search`: one-request KB lookup
+  against the WordPress REST feed (`--json` for the raw array); a query refuses
+  `--out`/`--offline` and reports `no matches` without failing.
+- `scrape-docs.sh --slug/--all --format text|markdown`: convert a cached KB body
+  to text in the gitignored cache, with pandoc when available and a built-in
+  awk/sed converter otherwise (no inline CSS, entities decoded once).
+
+### Changed
+
+- `gridpane-tooling/scripts/scrape-docs.sh` + `references/docs-manifest.json`:
+  index the KB from the public WordPress REST feed for the `kb` post type — four
+  requests for 387 posts, `X-WP-Total` cross-checked — instead of 387 page
+  fetches. Adds `--source api|sitemap`, `--since` (`modified_after` incremental
+  refresh), category names from `kbcategories`, and a
+  `{source, fetched_at, count, entries}` manifest envelope with per-entry
+  `modified`/`categories`/`source`.
+- `gridpane-tooling/references/docs.md` and
+  `gridpane-core/references/sources.md`: document the REST endpoints, the
+  manifest schema, search and extraction, and the measured request/payload
+  numbers; record the KB text-snapshot policy question in `OPEN-QUESTIONS.md`.
+
 ## v0.3.0 - 2026-10-20
 
 ### Changed

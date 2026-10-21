@@ -68,6 +68,10 @@ Changes to the skill set or safety model that need maintainer sign-off
 - **License (decided).** MIT confirmed; `LICENSE` and `README.md` reflect it.
 - **OpenLiteSpeed scope (decided).** Full OLS parity is in scope and tracked in
   the follow-up PGF `20261019-ols-parity`.
+- **KB text snapshots (open).** Whether extracted KB text should be committed for
+  offline agent use, or stay in the gitignored cache. Current behaviour: only the
+  manifest is committed; raw JSON/HTML and extracted Markdown never are
+  (`gridpane-tooling/references/docs.md`). Decide before any skill ships KB text.
 
 ## Needs real-server output
 
