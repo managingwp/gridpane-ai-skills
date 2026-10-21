@@ -73,6 +73,7 @@ tail -n 50 /var/log/nginx/example.com.error.log
 | SSL error / renewal fail | `ssl-provision.log`; cert dates; DNS | DNS not pointed; rate limit; challenge path blocked | `incident-triage` steps + `security` | Fix DNS then re-provision |
 | Redirect loop | `curl -I`; Cloudflare SSL mode; wp options | Cloudflare Flexible + origin redirect; site URL mismatch | `security/cloudflare`, `wordpress` | Set Full (strict); fix site URL |
 | DB connection error | MySQL service; error log; processlist | MySQL down; too many connections; disk full | `server-diagnostics/mysql` | Restart MySQL ([WRITE]); raise connections |
+| Backup spinner / backup "succeeds" with no revision | `active.backups.monitoring.log`; `backups.env` toggles; `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` | Scheduled run no-opped (toggle off); no completion callback; hung job holding the single queue slot | `gp-cli/references/backups.md` | Run a manual backup ([WRITE]); post the callback; fix the toggle/cron mismatch |
 
 ## 502 Bad Gateway
 
