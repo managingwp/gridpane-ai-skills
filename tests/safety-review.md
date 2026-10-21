@@ -40,3 +40,16 @@ back to the protocol rather than repeating a rollback on every row.
 | Site/database deletion | out of scope by default (safety.md rule 5) | Named by user only |
 
 No command in the skills performs an unattended or fleet-wide destructive action.
+
+## Backup-state [WRITE] actions
+
+These change GridPane's own backup bookkeeping, not site data. They are listed
+separately because the rollback is "the next run recreates it", not a reciprocal
+command.
+
+| Action | Where | Guard | Rollback |
+|---|---|---|---|
+| Post the completion callback (`gp -function-run 'gpbup::callback::manual_backup_status …'`, `gp callback /backups/backup …`) | `gp-cli/references/backups.md` | Only when nothing is running (`tsp -l` has no `running` row, the site lock is free); `status=failed` unless a backup completed; the output carries the server key | None needed — it reports state, it does not change data |
+| Remove a stale legacy PID lockfile `/opt/gridpane/backups/{site}-{storage}-{uuid}.pid` | `gp-cli/references/backups.md` | Only after the pid is dead and no `duplicacy` process exists for the site; never touch the `/run/gridpane/backups/` flock | The next run writes a new lockfile |
+| Delete a stale `backup-*` cron while the storage toggle is off | `gp-cli/references/backups.md` | Toggle really is `OFF` in `backups.env` | Re-save the schedule in the panel, which recreates it |
+
