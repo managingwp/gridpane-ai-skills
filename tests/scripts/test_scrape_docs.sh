@@ -329,19 +329,19 @@ ok "an X-WP-Total mismatch is fatal unless --partial"
 
 # --- refresh wrapper --------------------------------------------------------
 
-WRAPPER="$REPO_ROOT/scripts/refresh-kb-docs.sh"
+WRAPPER="$REPO_ROOT/scripts/gridpane-kb-docs.sh"
 [[ -x "$WRAPPER" ]] || fail "wrapper not executable: $WRAPPER"
 "$WRAPPER" --help >/dev/null || fail "wrapper --help did not exit 0"
 "$WRAPPER" --bogus >/dev/null 2>&1 && fail "wrapper accepted an unknown option"
-"$WRAPPER" --check-only --offline >/dev/null 2>&1 && fail "wrapper allowed --check-only --offline"
+"$WRAPPER" check --offline >/dev/null 2>&1 && fail "wrapper allowed --check-only --offline"
 
 printf '{"fetched_at":"2027-01-01T00:00:00Z"}\n' > "$WORK/probe-cache/last-run.json"
-"$WRAPPER" --check-only --cache "$WORK/probe-cache" --probe-json "$WORK/probe.json" \
-    >/dev/null 2>&1 || fail "wrapper --check-only should exit 0 when unchanged"
+"$WRAPPER" check --cache "$WORK/probe-cache" --probe-json "$WORK/probe.json" \
+    >/dev/null 2>&1 || fail "wrapper check should exit 0 when unchanged"
 
 printf '{"fetched_at":"2026-01-01T00:00:00Z"}\n' > "$WORK/probe-cache/last-run.json"
-"$WRAPPER" --check-only --cache "$WORK/probe-cache" --probe-json "$WORK/probe.json" \
-    >/dev/null 2>&1 && fail "wrapper --check-only should exit 3 when changes exist"
-ok "the wrapper rejects bad flags and exits 0/3 from --check-only"
+"$WRAPPER" check --cache "$WORK/probe-cache" --probe-json "$WORK/probe.json" \
+    >/dev/null 2>&1 && fail "wrapper check should exit 3 when changes exist"
+ok "the wrapper rejects bad flags and exits 0/3 from check"
 
 printf 'All scrape-docs tests passed.\n'

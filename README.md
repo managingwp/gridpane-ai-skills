@@ -102,7 +102,7 @@ Repository tooling, run from a clone:
 |---|---|
 | `scripts/install.sh` | Copy or symlink skills into an agent's skills directory (`--target`, `--link`, `--skills`); always includes `gridpane-core` |
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, secrets, IPs, domains. Run before committing; exits non-zero on a problem |
-| `scripts/refresh-kb-docs.sh` | Refresh the committed KB manifest: probe for changes, index into a dated snapshot (10 s between requests), diff, and publish only where the KB changed. `--check-only` answers "did anything change?" in one request and exits 3 when it did |
+| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache: `status` (ingested, cached, extracted, drift), `check` (one request, exit 3 when the KB moved), `refresh` (probe, index a dated snapshot, diff, publish only where the KB changed) |
 
 Shipped with the skills and used by them:
 
@@ -185,7 +185,7 @@ gridpane-ai-skills/
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh
-├── scripts/                # install.sh, lint-skills.sh, refresh-kb-docs.sh
+├── scripts/                # install.sh, lint-skills.sh, gridpane-kb-docs.sh
 └── tests/                  # trigger evals, script tests (test_scrape_docs.sh, ...), scenarios
 ```
 

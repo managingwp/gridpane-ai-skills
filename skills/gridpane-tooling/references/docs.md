@@ -159,16 +159,16 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --since-last --out /tmp/kb-delta.
 
 ### Refresh workflow
 
-`scripts/refresh-kb-docs.sh` chains the steps for the routine refresh:
+`scripts/gridpane-kb-docs.sh` chains the steps for the routine refresh:
 
 ```bash
 # [READ] One request. Exit 0 = nothing changed, 3 = something did.
-scripts/refresh-kb-docs.sh --check-only
+scripts/gridpane-kb-docs.sh check
 ```
 
 ```bash
 # [READ] Probe, index into a new snapshot, diff, publish the manifest if changed.
-scripts/refresh-kb-docs.sh
+scripts/gridpane-kb-docs.sh refresh
 ```
 
 - Exit codes: `0` done or nothing to do, `3` `--check-only` found changes, `2`

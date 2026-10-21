@@ -93,12 +93,12 @@ Before shipping a change that cites GridPane knowledge-base facts, check whether
 
 ```bash
 # [READ] One request. Exit 0 = nothing changed, 3 = something did.
-scripts/refresh-kb-docs.sh --check-only
+scripts/gridpane-kb-docs.sh check
 ```
 
 ```bash
 # [READ] Full refresh: probe, index into a new dated snapshot, diff, publish.
-scripts/refresh-kb-docs.sh
+scripts/gridpane-kb-docs.sh refresh
 ```
 
 - The wrapper runs `scrape-docs.sh` with its defaults: **10 seconds between live requests**, a count guard against the previous snapshot, and a hard failure when the manifest disagrees with the API's `X-WP-Total`. It copies the new manifest to `skills/gridpane-tooling/references/docs-manifest.json` only when the content actually changed.
