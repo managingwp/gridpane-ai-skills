@@ -17,7 +17,8 @@
 # content.rendered for --source api. It is there to detect change between runs.
 #
 # Raw JSON and HTML stay in the (gitignored) cache directory; only the manifest
-# is meant to be committed. No GridPane page text is rehosted.
+# is meant to be committed. No GridPane page text is rehosted: extracted text is
+# written to the cache as <slug>.md and must never be committed.
 #
 # This script only reads public endpoints. It never touches a GridPane server
 # and never modifies the fetched site.
@@ -33,6 +34,9 @@
 #   --limit N            Only process the first N entries (search: result cap)
 #   --search QUERY       One-request KB lookup: print slug/modified/url/title
 #   --json               With --search: emit the raw result array instead of TSV
+#   --format text|markdown  With --slug/--all: extract a cached body to text
+#   --slug SLUG          Extract one article (by WordPress slug) into the cache
+#   --all                Extract every slug present in the cached API pages
 #   --delay SECONDS      Delay between fetches (default 1)
 #   --offline            Do not fetch; read pages from the cache only
 #   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -56,6 +60,9 @@ OFFLINE=0
 CONVERT=1
 SEARCH=""
 JSON_OUT=0
+SLUG=""
+EXTRACT_ALL=0
+FORMAT=""
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -81,6 +88,9 @@ Options:
   --limit N            Only process the first N entries (search: result cap)
   --search QUERY       One-request KB lookup: print slug, modified, url, title
   --json               With --search: emit the raw result array instead of TSV
+  --format text|markdown  With --slug/--all: extract a cached body to text
+  --slug SLUG          Extract one article (by WordPress slug) into the cache
+  --all                Extract every slug present in the cached API pages
   --delay SECONDS      Delay between fetches (default ${DELAY})
   --offline            Do not fetch; read pages from the cache only
   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -169,6 +179,109 @@ search_kb() {
         | @tsv' <<<"$json")
 }
 
+# --- extraction -------------------------------------------------------------
+
+# Walk the markup with awk using "<" as the record separator: every record is a
+# tag plus the text that follows it up to the next tag. Element bodies for
+# script/style/svg/noscript are dropped until their closing tag, so inline CSS
+# and SVG paths never reach the output. <p>/<li>/<br>/… become line breaks.
+html_to_text() {
+    local fmt="$1"
+    awk -v fmt="$fmt" '
+    BEGIN { RS = "<"; ORS = ""; skip = "" }
+    {
+        if (NR == 1) { out = out $0; next }
+        cend = index($0, ">")
+        if (cend == 0) next
+        name = tolower(substr($0, 1, cend - 1))
+        sub(/[ \t].*$/, "", name)
+        text = substr($0, cend + 1)
+
+        if (skip != "") {
+            if (name == "/" skip) skip = ""
+            next
+        }
+        if (name == "script" || name == "style" || name == "svg" \
+                || name == "noscript" || name == "head") {
+            skip = name
+            next
+        }
+        if (name == "br" || name ~ /^\/(p|div|li|tr|h[1-6]|pre|blockquote|section|article|table|ul|ol)$/) {
+            out = out "\n"
+        } else if (name == "td" || name == "th") {
+            out = out (fmt == "markdown" ? "| " : "\t")
+        } else if (name == "li" && fmt == "markdown") {
+            out = out "- "
+        }
+        out = out text
+    }
+    END { printf "%s\n", out }
+    '
+}
+
+# Print one article body from the cache: first the API page caches (exact body,
+# no theme chrome), then the sitemap HTML cache.
+read_body() {
+    local slug="$1" f
+    for f in "$CACHE"/api-page-*.json "$CACHE"/api-since-*-page-*.json; do
+        [[ -f "$f" ]] || continue
+        if jq -e --arg s "$slug" 'any(.[]; .slug == $s)' < "$f" >/dev/null 2>&1; then
+            jq -r --arg s "$slug" '.[] | select(.slug == $s) | .content.rendered' < "$f"
+            return 0
+        fi
+    done
+    for f in "$CACHE"/*_"$(slugify "$slug")".html; do
+        [[ -f "$f" ]] || continue
+        cat "$f"
+        return 0
+    done
+    return 1
+}
+
+extract_one() {
+    local slug="$1" body converter
+    if ! body="$(read_body "$slug")"; then
+        log "no cached body for slug: $slug"
+        return 1
+    fi
+
+    if [[ "$FORMAT" == "markdown" ]] && have pandoc; then
+        body="$(printf '%s' "$body" | pandoc -f html -t gfm 2>/dev/null)" || body=""
+        converter="pandoc"
+        if [[ -z "$body" ]]; then
+            log "warning: pandoc produced nothing for $slug; using the fallback"
+            body="$(read_body "$slug" | html_to_text "$FORMAT" | decode_entities)"
+            converter="fallback"
+        fi
+    else
+        body="$(printf '%s' "$body" | html_to_text "$FORMAT" | decode_entities)"
+        converter="fallback"
+    fi
+
+    # Trim per-line indentation the Elementor wrappers leave behind, squeeze
+    # repeated blank lines, and drop leading blank lines.
+    body="$(printf '%s\n' "$body" \
+        | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+        | cat -s | sed -e '/./,$!d')"
+
+    printf '%s\n' "$body" > "$CACHE/$slug.md"
+    log "wrote $CACHE/$slug.md ($converter, $(wc -c < "$CACHE/$slug.md" | tr -d ' ') bytes)"
+}
+
+extract_slugs() {
+    if [[ -n "$SLUG" ]]; then
+        extract_one "$SLUG"
+        return
+    fi
+    if ! ls "$CACHE"/api-page-*.json >/dev/null 2>&1; then
+        die "--all needs cached API pages; run the index first (no --offline)"
+    fi
+    jq -r '.[].slug' "$CACHE"/api-page-*.json | sort -u | while IFS= read -r s; do
+        [[ -n "$s" ]] || continue
+        extract_one "$s" || true
+    done
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --source)      SOURCE="${2:?--source needs a value}"; shift 2 ;;
@@ -181,6 +294,9 @@ while [[ $# -gt 0 ]]; do
         --limit)       LIMIT="${2:?--limit needs a value}"; shift 2 ;;
         --search)      SEARCH="${2:?--search needs a value}"; shift 2 ;;
         --json)        JSON_OUT=1; shift ;;
+        --format)      FORMAT="${2:?--format needs a value}"; shift 2 ;;
+        --slug)        SLUG="${2:?--slug needs a value}"; shift 2 ;;
+        --all)         EXTRACT_ALL=1; shift ;;
         --delay)       DELAY="${2:?--delay needs a value}"; shift 2 ;;
         --offline)     OFFLINE=1; shift ;;
         --no-convert)  CONVERT=0; shift ;;
@@ -221,6 +337,32 @@ fi
 
 if [[ "$JSON_OUT" -eq 1 ]]; then
     log "error: --json needs --search"
+    exit 2
+fi
+
+if [[ -n "$SLUG" || "$EXTRACT_ALL" -eq 1 ]]; then
+    case "$FORMAT" in
+        ""|text|markdown) ;;
+        *) log "error: --format must be text or markdown"; exit 2 ;;
+    esac
+    FORMAT="${FORMAT:-markdown}"
+    if [[ -n "$SLUG" && "$EXTRACT_ALL" -eq 1 ]]; then
+        log "error: use --slug or --all, not both"
+        exit 2
+    fi
+    if [[ -n "$OUT" ]]; then
+        log "error: --slug/--all write into the cache; do not combine with --out"
+        exit 2
+    fi
+    if [[ "$FORMAT" == "markdown" ]] && ! have pandoc; then
+        log "warning: pandoc not found; using the built-in converter"
+    fi
+    extract_slugs
+    exit 0
+fi
+
+if [[ -n "$FORMAT" ]]; then
+    log "error: --format needs --slug or --all"
     exit 2
 fi
 
