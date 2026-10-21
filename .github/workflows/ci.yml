@@ -44,6 +44,7 @@ jobs:
           printf 'discovery ok: %s skills, no scaffold\n' "$expected_count"
       - name: Run script tests
         run: |
+          ./tests/scripts/test_lint_skills.sh
           ./tests/scripts/test_gp_api.sh
           ./tests/scripts/test_scrape_docs.sh
           ./tests/scripts/test_scrape_changelog.sh
