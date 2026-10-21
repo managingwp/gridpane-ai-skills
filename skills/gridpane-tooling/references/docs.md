@@ -133,6 +133,74 @@ directory instead of the automatically detected previous one. A change to
 worth re-reading an article for. The command is read-only: no network, no
 writes, and it exits 0 even when every entry changed.
 
+### Change detection
+
+The site sends **no `Last-Modified` and no `ETag`**, and answers no `304`s
+(`If-Modified-Since` still returns 200), so an HTTP-header check is not
+available. Use the probe instead — one request, ~200 bytes:
+
+```bash
+# [READ] Newest modified_gmt and slug; --since-last says whether that is news.
+skills/gridpane-tooling/scripts/scrape-docs.sh --probe
+skills/gridpane-tooling/scripts/scrape-docs.sh --probe --since-last
+```
+
+`--since-last` compares the newest `modified_gmt` with the `fetched_at` of the
+last complete run (the `last-run.json` cursor) and prints `no changes since
+<date>` when nothing is newer. The cursor records the run's *start* time, so a
+post edited while the previous run was still fetching is not missed.
+
+`--since-last` on an index run builds `modified_after` from the same cursor:
+
+```bash
+# [READ] Fetch only posts edited since the last complete run.
+skills/gridpane-tooling/scripts/scrape-docs.sh --since-last --out /tmp/kb-delta.json
+```
+
+### Refresh workflow
+
+`scripts/refresh-kb-docs.sh` chains the steps for the routine refresh:
+
+```bash
+# [READ] One request. Exit 0 = nothing changed, 3 = something did.
+scripts/refresh-kb-docs.sh --check-only
+```
+
+```bash
+# [READ] Probe, index into a new snapshot, diff, publish the manifest if changed.
+scripts/refresh-kb-docs.sh
+```
+
+- Exit codes: `0` done or nothing to do, `3` `--check-only` found changes, `2`
+  usage error, `1` failure.
+- `--offline` skips the probe and rebuilds from the newest snapshot;
+  `--manifest FILE` publishes somewhere else (fixtures); `--json` prints a
+  summary object. `--base`, `--cache`, `--snapshot`, `--partial` and
+  `--allow-fast` pass through to the scraper.
+- It publishes with `cp`+`mv` to the committed manifest only when the content
+  changed (timestamps ignored), so a no-op refresh leaves git clean.
+- The index's own guards run unchanged: a count drop or an `X-WP-Total`
+  mismatch aborts before anything is published.
+
+### Date model
+
+Five date surfaces, verified 2026-10-21 on
+`/kb/cache-warming-gridpane-sitemap-driven-crawler/`:
+
+| Surface | Format | Value for the sample article |
+|---|---|---|
+| REST `modified` / `date` | site-local, no offset (`UTC-4`) | `2026-10-07T00:34:33` |
+| REST `modified_gmt` / `date_gmt` | UTC | `2026-10-07T04:34:33` |
+| Page `<time datetime>` | local with offset | `2026-10-07T00:34:33-04:00` |
+| Page `<meta article:modified_time>` and JSON-LD `dateModified` | UTC | `2026-10-07T04:34:33+00:00` |
+| Sitemap `lastmod` | UTC | `2026-10-07T04:34:33+00:00` |
+
+The UTC values agree across REST, page metadata and sitemap. The manifest stores
+only `modified_gmt`/`date_gmt`; never compare a `modified` value from the REST
+`modified` field with any of the others. HTTP `Last-Modified`/`ETag` are absent,
+which is why change detection is a payload probe rather than a conditional
+request.
+
 ### Politeness and provenance
 
 - Descriptive User-Agent, `--retry 3`, a **10 s delay** between live requests

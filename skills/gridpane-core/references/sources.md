@@ -95,6 +95,13 @@ sitemap's 387 `/kb/` URLs, and `robots.txt` disallows only `/wp-admin/`. The
 routes are public today but are not a stability guarantee, which is why the
 sitemap path is kept as `--source sitemap`.
 
+Date model, checked **2026-10-21** on one article: REST `modified`/`date` are
+site-local (UTC-4) while `modified_gmt`/`date_gmt` are UTC; the page's
+`<meta article:modified_time>` and JSON-LD `dateModified` and the sitemap
+`lastmod` all equal `modified_gmt`. The site sends **no `Last-Modified` or
+`ETag`** and answers no `304`s, so change detection uses the REST probe rather
+than a conditional request (`gridpane-tooling/references/docs.md`).
+
 ## OpenLiteSpeed (`gridpane-core/references/ols.md`)
 
 All checked **2026-10-19**. Snapshot files: `tmp/gpcli/usr/local/bin/gpols`,

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scripts/refresh-kb-docs.sh`: one command to refresh the committed KB
+  manifest — probe for changes (`--check-only`, exit 3 when there are any),
+  index into a new dated snapshot, diff it against the previous one, and publish
+  `references/docs-manifest.json` only when its content changed.
 - `gridpane-tooling/scripts/scrape-docs.sh --search`: one-request KB lookup
   against the WordPress REST feed (`--json` for the raw array); a query refuses
   `--out`/`--offline` and reports `no matches` without failing.
@@ -35,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refresh), category names from `kbcategories`, and a
   `{source, fetched_at, count, entries}` manifest envelope with per-entry
   `modified`/`categories`/`source`.
+- `scrape-docs.sh` dates: the manifest `modified` is now UTC (`modified_gmt`)
+  with a new `published` from `date_gmt` and `schema: 2`, because the REST
+  `modified` field is site-local (UTC-4). Adds `--probe` (one request returns
+  the newest `modified_gmt`; the site sends no `Last-Modified`/`ETag`) and
+  `--since-last`; search prints UTC dates too.
+- `scrape-docs.sh` snapshots and guards: every live run writes
+  `out/gridpane-docs-cache/<YYYY-MM-DD>[-N]/` and points `latest` at it, never
+  overwriting an existing snapshot. The request delay defaults to 10 s and is a
+  floor for live runs (`--allow-fast` for fixtures only). Aborts on a >10% entry
+  count drop (`--force`), an `X-WP-Total` mismatch (`--partial`), a non-array or
+  >8 MB response, or a concurrent run (`flock`). `--diff` reports
+  added/removed/changed/title-only between two snapshots.
+- `AGENTS.md` and `gridpane-tooling/references/docs.md`: add the "Refreshing KB
+  facts" workflow, the snapshot/guard reference and the five-surface date model
+  (which value is UTC and which is site-local).
 - `gridpane-tooling/references/docs.md` and
   `gridpane-core/references/sources.md`: document the REST endpoints, the
   manifest schema, search and extraction, and the measured request/payload
