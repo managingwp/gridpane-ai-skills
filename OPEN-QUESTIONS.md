@@ -46,6 +46,23 @@ the skill and reference file that mentions it, plus what would confirm it.
 - **MariaDB vs MySQL.** The captured stack is Percona and the scripts detect
   MariaDB (`lib/services.sh`), referencing `mysql.service`. Confirm the unit names
   on a MariaDB box (`gridpane-server-diagnostics/references/mysql.md`).
+- **Panel local backups use the scheduled path.** On one server a panel-triggered
+  local backup arrived as a `-single-site local` task (an entry in
+  `active.backups.monitoring.log`, none in `manual-backups.log`) and therefore
+  never posted `/backups/backup`. Confirm the panel behaves the same after a
+  local toggle change and on a second server
+  (`gridpane-gp-cli/references/backups.md`).
+- **`gp -function-run` as a state-clearing path.** Posting
+  `gpbup::callback::manual_backup_status 1 {site} local` re-enabled the panel's
+  backup buttons on the observed server. It is an internal entry point with no
+  KB page; confirm GridPane support treats it as safe, and that
+  `status=failed` is the accepted value for clearing the state on all plans
+  (`gridpane-gp-cli/references/backups.md`).
+- **Cron written for a storage whose toggle is off.** `-set-backup-schedule`
+  gates on `checkbackupsenabled` with no type, so a `local` cron can exist while
+  `Local-Backups:OFF`. Observed once: a `backup-daily-local-*` file alongside
+  `Local-Backups:OFF`. Confirm whether the app intends this or whether the cron
+  should track the per-storage toggle (`gridpane-gp-cli/references/backups.md`).
 
 ### OpenLiteSpeed
 
@@ -72,6 +89,14 @@ Changes to the skill set or safety model that need maintainer sign-off
   offline agent use, or stay in the gitignored cache. Current behaviour: only the
   manifest is committed; raw JSON/HTML and extracted Markdown never are
   (`gridpane-tooling/references/docs.md`). Decide before any skill ships KB text.
+- **Backup and restore coverage (open).** Backups are documented in
+  `gridpane-gp-cli/references/backups.md`, but the repo has no restore guidance
+  at all while `lib/restore.sh` sits unused in the snapshot. Proposal: a
+  `gridpane-backup-restore` skill covering local and remote restore, the
+  `/backups/restore` callback path, the pre-restore safeguards (quiesce the site,
+  verify the revision, confirm the target), and when to hand off to GridPane
+  support instead. Needs sign-off before a new skill folder appears under
+  `skills/`.
 
 ## Needs real-server output
 
