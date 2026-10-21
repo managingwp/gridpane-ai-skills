@@ -12,13 +12,31 @@
 #
 # Exits non-zero if any check fails.
 #
-# Usage: lint-skills.sh [skills-dir]
+# Usage: lint-skills.sh [skills-dir]   (or --help)
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILLS_DIR="${1:-$REPO_ROOT/skills}"
+usage() {
+    cat <<EOF
+Usage: lint-skills.sh [skills-dir]
+
+Repository checks for the GridPane Agent Skills: SKILL.md frontmatter, command
+labels, relative links, secrets, IPs and domains. Run from the repo root; exits
+non-zero when a check fails.
+
+Options:
+  [skills-dir]   Directory to lint (default: <repo>/skills)
+  -h, --help     Show this help and exit
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    "")        SKILLS_DIR="$REPO_ROOT/skills" ;;
+    *)         SKILLS_DIR="$1" ;;
+esac
 
 errors=0
 error() { printf 'LINT: %s\n' "$1" >&2; errors=$(( errors + 1 )); }
