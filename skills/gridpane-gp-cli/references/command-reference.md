@@ -1,9 +1,10 @@
 # gp command reference
 
 Verified `gp` commands, grouped by area. Every row carries a label. This is
-extracted from the GP-CLI Quick Reference and the dedicated KB articles
-(see `sources.md`). When in doubt, confirm flags with `gp … --help` on the
-server before running.
+extracted from the GP-CLI Quick Reference and the dedicated KB articles, plus
+the deployed script snapshot for the internal entry points the KB does not
+document (see `sources.md`). When in doubt, confirm flags with `gp … --help` on
+the server before running.
 
 For the complete dispatcher view — every top-level command including internal
 ones such as `audit`, `conf` and `function-run`, mapped to the functions they
@@ -146,11 +147,55 @@ Per-site overrides (positional `{site.url}` last):
 | Label | Command | Notes |
 |---|---|---|
 | [WRITE] | `gpbup2 {site.url} -local-single-site` | Trigger one local v2 backup. |
+| [WRITE] | `gpbup {site.url} -local-single-site` / `-remote-single-site {storage}` | Manual backup, tagged `<epoch>-manual`. |
+| [WRITE] | `gpbup {site.url} -run-single-site {storage}` | Cron interface: queue one scheduled-form backup (async). |
 | [WRITE] | `gpbup {site.url} -remote-bup-on` / `-remote-bup-off` | Toggle automated remote backups. |
 | [WRITE] | `gpbup all-sites -remote-bup-on` / `-remote-bup-off` | **All sites.** |
 | [DESTRUCTIVE] | `gpbup {site.url} -purge {storage} "{from}" "{to}"` | Delete backups in a date range. |
 | [WRITE] | `gpbup -update-gridpane-backups-system` | Update the backup system. |
 | [WRITE] | `gpbup {site.url} -set-backup-schedule …` | Set a schedule. |
+
+`{storage}` is `local` or a configured remote (`aws-s3`, `backblaze`, `dropbox`,
+`wasabi`). The site argument must match the `/var/www/{site}` directory name
+exactly; `www.` and `staging.` forms address a different site or fail.
+
+### How the backup entry points differ
+
+`gpbup` and `gpbup2` are one-line wrappers: `set -- "backup" "$@"` then source
+`/usr/local/bin/gp`, so every call lands in `gpbup::main`.
+
+- `-run-single-site {storage}` is what GridPane writes into
+  `/etc/cron.d/backup-{interval}-{storage}-{site}`, so it is the scheduled-run
+  path. It does not back anything up itself: it queues
+  `gp backup {site} -single-site {storage}` in the task-spooler queue on socket
+  `/tmp/ts-socket-backups.<uid>` (installed on demand, one job at a time) and
+  returns at once, printing the task id. A plain `tsp -l` looks empty because it
+  uses the default socket; use
+  `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` to watch it.
+- `-single-site {storage}` is that queued executor. It runs in the foreground
+  and logs to `/opt/gridpane/active.backups.monitoring.log`.
+
+Both end in `gpbup::backup {site} {storage}`, which for `local`:
+
+1. requires `Local-Backups:ON` in `/var/www/{site}/logs/backups.env`; when local
+   backups are off for the site it backs up **nothing** and still exits 0, so a
+   zero exit here is not proof a backup exists;
+2. waits for the per-site backup lock rather than skipping the run (manual
+   backups do not wait); if the lock is not obtained, the `-single-site` arm
+   returns 1 instead of 0, so a queued job is not recorded as a success;
+3. refuses when free space on `/opt/gridpane/backups/duplications` minus the
+   database dump would fall below `backup-max-disk-usage`% of the filesystem
+   (default 10%);
+4. dumps the database, then runs `duplicacy backup -t gp-automated`, so the
+   revision lists as an **automatic** local backup, and this path does **not**
+   prune.
+
+Prefer `-local-single-site` when you want a backup an operator can identify: it
+is tagged `<epoch>-manual`, takes the lock without waiting, does not require the
+`Local-Backups:ON` toggle, checks the disk threshold after the dump, and
+refreshes the available-backups list so the UI shows the new revision. All of
+these need root, because the Duplicacy password comes from
+`/root/gridcreds/gridpane.uuid`.
 
 ## WP debug, cron, compression, auth, CSP
 

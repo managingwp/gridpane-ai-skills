@@ -7,6 +7,8 @@ should_trigger:
   - "explain the gp site suspend command"
   - "run the gp command to enable 7g on example.com"
   - "what gp flags affect every site on the server"
+  - "what does gpbup example.com -run-single-site local do"
+  - "did our scheduled local backup actually run for example.com"
 
 should_not_trigger:
   - "clear all caches for example.com and check redis is being used"

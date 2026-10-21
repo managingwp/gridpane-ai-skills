@@ -111,6 +111,11 @@ Every [WRITE] command above includes its rollback. General rules:
 - **`gp wp` vs raw `wp`.** Use `gp wp {site.url} …` so WP-CLI runs as the correct
   site system user. `--ssh` is not supported through `gp wp`; use raw WP-CLI for
   that case (see `gridpane-wordpress`).
+- **A zero exit from a backup command is not proof a backup exists.**
+  `gpbup {site} -run-single-site local` only queues the job (task-spooler socket
+  `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
+  site the queued run backs up nothing and still exits 0. See
+  `references/command-reference.md` before relying on either.
 
 ## Sources
 
@@ -121,4 +126,4 @@ Every [WRITE] command above includes its rollback. General rules:
 See `references/command-reference.md` for the verified command set and
 `gridpane-core/references/sources.md` for the rest.
 
-Last verified: 2026-10-09
+Last verified: 2026-10-21

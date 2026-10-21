@@ -76,6 +76,7 @@ here.
 | `tmp/gpcli/AGENTS.md` | Snapshot conventions, `sync.sh` mirroring |
 | `tmp/gpcli/usr/local/bin/gp` | Dispatcher, sourcing, dispatch labels, unknown-command exit `187` |
 | `tmp/gpcli/usr/local/bin/gpupdate` | Update model, `/run/gridpane` lock |
+| `tmp/gpcli/usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh` | Backup wrapper and `gpbup::main` arms (`-run-single-site`, `-single-site`, `-local-single-site`, `-purge`), `/etc/cron.d/backup-*` line shape, `Local-Backups:ON` prerequisite, local disk threshold, task-spooler queue socket, `gp-automated` revision tag |
 | `tmp/gpcli/usr/local/bin/lib/*.sh` | Path references (`/opt/gridpane`, `/root/gridcreds`, `/var/log`, `/etc/cron.d`, `/etc/logrotate.d`) |
 | `tmp/gpcli/etc/monit/conf.d/programs` | Monit program checks and `gpmonitor` exec pattern |
 | `tmp/gpcli/docs/monit-slack-notifications.md` | monit → `gpmonitor` → GridPane API → Slack chain |

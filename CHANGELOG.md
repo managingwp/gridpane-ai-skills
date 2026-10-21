@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `gridpane-gp-cli`: documented the backup entry points the KB omits, traced to
+  `lib/gpbup.sh` in the script snapshot — `gpbup {site} -run-single-site
+  {storage}` (the `/etc/cron.d/backup-*` path: queues `-single-site` in the
+  task-spooler `backups` socket and returns), `-single-site` as its executor, and
+  the `local` arm's conditions: `Local-Backups:ON`, the per-site lock, the
+  `backup-max-disk-usage` threshold, the `gp-automated` revision tag, and no
+  prune. `sources.md` now traces `gpbup`, `gpbup2` and `lib/gpbup.sh`.
 - `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
   `status` reports how many articles are ingested (the committed manifest),
   cached (the newest snapshot) and extracted, plus the drift between them, the
