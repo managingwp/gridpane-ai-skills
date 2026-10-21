@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   20-minute wait and one-hour stuck thresholds; and the trap that
   `-set-backup-schedule` writes a cron for a storage whose toggle is off, so a
   local cron can exist with `Local-Backups:OFF`.
+- `gridpane-gp-cli`: added the callback-only unlock — `gp -function-run
+  'gpbup::callback::manual_backup_status 1 {site} local'` posts
+  `/backups/backup` with `status=failed` and re-enables the panel without taking
+  a backup, plus the raw `gp callback /backups/backup …` form and its server-key
+  warning; recorded what a completed manual local run looks like; and noted that
+  the panel's local button arrives as a scheduled-form run, so it needs the local
+  toggle `ON` while CLI one-offs do not.
 - `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
   `status` reports how many articles are ingested (the committed manifest),
   cached (the newest snapshot) and extracted, plus the drift between them, the

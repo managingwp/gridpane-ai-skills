@@ -222,9 +222,17 @@ Fix: run the manual backup in the foreground and let it finish.
 gpbup example.com -local-single-site
 ```
 
-A completed run logs `Manual Local Backup Success!` and
-`Backup of example.com Done!` in `/var/www/example.com/logs/manual-backups.log`.
-A failed run posts `failed` and still clears the spinner.
+A completed run logs, in `/var/www/example.com/logs/manual-backups.log`:
+
+```
+Manual Local database export success!
+Backup for /var/www/example.com at revision 1 completed
+Manual Local Backup Success!
+```
+
+followed by the `available-backups` refresh whose payload carries
+`"local":{"manual":"<date>"}` — that is the panel's proof the revision exists. A
+failed run posts `failed` and still clears the spinner.
 
 Before running, rule out a same-site holder:
 
@@ -235,6 +243,35 @@ Before running, rule out a same-site holder:
 - `/opt/gridpane/backups/{site}-{storage}-{uuid}.pid` — the legacy PID
   lockfile. A live pid, or any `duplicacy` process for the site, refuses the run.
 
+### Clearing the spinner without taking a backup
+
+When nothing is actually running and the panel still spins, post the same
+completion callback the manual path posts. The supported way is the reporting
+function itself, which fills `site_id` and the server ids from the environment:
+
+```bash
+# [WRITE] Panel state only: posts /backups/backup with status=failed for this
+# site and local storage, which re-enables the buttons. No backup runs and no
+# site data changes. Confirm before running.
+gp -function-run 'gpbup::callback::manual_backup_status 1 example.com local'
+```
+
+Pass `1` (failed) unless a backup really did complete; `0` claims a success the
+app will show in the site's backup history. The raw form, when you want to see
+the request, is the endpoint the script itself calls:
+
+```bash
+# [WRITE] Same POST, spelled out. The printed response contains the server key:
+# do not paste it into a ticket or transcript.
+gp callback /backups/backup -- site_url=example.com site_id={site_id} \
+  server_ip={server_ip} server_id={server_id} status=failed service=local \
+  -s 'details="Backup Processes Complete: example.com - local backup failed"'
+```
+
+Only do this when `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` shows no `running`
+row and `/run/gridpane/backups/{site}.lock` is free: clearing the spinner while a
+real backup is in flight hides the problem instead of reporting it.
+
 ### A local cron can outlive the toggle
 
 `-set-backup-schedule` writes `/etc/cron.d/backup-{interval}-{storage}-{site}`
@@ -243,6 +280,15 @@ site with `Remote-Backups:ON` and `Local-Backups:OFF` can therefore carry a
 daily local cron whose every run exits 0 without backing anything up. Check
 `/var/www/{site}/logs/backups.env`, not the cron file, when deciding whether
 local backups actually run.
+
+The panel's local backup button arrives as a scheduled-form run — a
+`-single-site local` task in the queue and an entry in
+`active.backups.monitoring.log`, not in `manual-backups.log` — so with the toggle
+`OFF` a UI-triggered local backup no-ops and leaves the spinner. One-off local
+backups from the CLI (`-local-single-site`) are unaffected, because the manual
+path never reads the toggle. If you want local backups from the UI, the toggle
+has to be `ON`, which also means GridPane keeps a schedule for that site; set the
+interval to what you actually want rather than deleting the cron.
 
 All scheduled runs share one task-spooler slot, so one hung job stalls every
 other site's schedule. Inspect with

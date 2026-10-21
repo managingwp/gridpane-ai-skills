@@ -124,6 +124,8 @@ Every [WRITE] command above includes its rollback. General rules:
 - **A spinning backup button needs a manual backup, not a scheduled one.** Only
   `-local-single-site` / `-remote-single-site` post `/backups/backup`, the call
   that re-enables the panel. Run one in `tmux`; an SSH drop skips the callback.
+  If nothing is running and it still spins, post that callback directly with
+  `gp -function-run 'gpbup::callback::manual_backup_status 1 {site} local'`.
 
 ## Sources
 
