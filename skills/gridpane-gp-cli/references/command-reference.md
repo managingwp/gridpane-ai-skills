@@ -149,6 +149,7 @@ Per-site overrides (positional `{site.url}` last):
 | [WRITE] | `gpbup2 {site.url} -local-single-site` | Trigger one local v2 backup. |
 | [WRITE] | `gpbup {site.url} -local-single-site` / `-remote-single-site {storage}` | Manual backup, tagged `<epoch>-manual`. |
 | [WRITE] | `gpbup {site.url} -run-single-site {storage}` | Cron interface: queue one scheduled-form backup (async). |
+| [WRITE] | `gpbup {site.url} -local-bup-on` / `-local-bup-off` | Toggle automated local backups; `-on` also writes the local schedule cron and syncs the panel. |
 | [WRITE] | `gpbup {site.url} -remote-bup-on` / `-remote-bup-off` | Toggle automated remote backups. |
 | [WRITE] | `gpbup all-sites -remote-bup-on` / `-remote-bup-off` | **All sites.** |
 | [DESTRUCTIVE] | `gpbup {site.url} -purge {storage} "{from}" "{to}"` | Delete backups in a date range. |
@@ -179,7 +180,10 @@ Both end in `gpbup::backup {site} {storage}`, which for `local`:
 
 1. requires `Local-Backups:ON` in `/var/www/{site}/logs/backups.env`; when local
    backups are off for the site it backs up **nothing** and still exits 0, so a
-   zero exit here is not proof a backup exists;
+   zero exit here is not proof a backup exists. A skipped run is easy to spot: it
+   finishes in about a second and `active.backups.monitoring.log` stops at
+   `Local backups are NOT enabled for {site}.` with no `Backup of {site} Done!`
+   line;
 2. waits for the per-site backup lock rather than skipping the run (manual
    backups do not wait); if the lock is not obtained, the `-single-site` arm
    returns 1 instead of 0, so a queued job is not recorded as a success;

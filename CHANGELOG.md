@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `local` arm's conditions: `Local-Backups:ON`, the per-site lock, the
   `backup-max-disk-usage` threshold, the `gp-automated` revision tag, and no
   prune. `sources.md` now traces `gpbup`, `gpbup2` and `lib/gpbup.sh`.
+- `gridpane-gp-cli`: added `gpbup {site} -local-bup-on` / `-local-bup-off` (the
+  toggle also writes the local schedule cron and syncs the panel) and the
+  observable signature of a skipped local run: about a second, exit 0, and
+  `active.backups.monitoring.log` stopping at `Local backups are NOT enabled`
+  with no `Done!` line.
 - `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
   `status` reports how many articles are ingested (the committed manifest),
   cached (the newest snapshot) and extracted, plus the drift between them, the
