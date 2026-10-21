@@ -331,6 +331,7 @@ ok "an X-WP-Total mismatch is fatal unless --partial"
 
 WRAPPER="$REPO_ROOT/scripts/gridpane-kb-docs.sh"
 [[ -x "$WRAPPER" ]] || fail "wrapper not executable: $WRAPPER"
+CLI="$WRAPPER"
 "$WRAPPER" --help >/dev/null || fail "wrapper --help did not exit 0"
 "$WRAPPER" --bogus >/dev/null 2>&1 && fail "wrapper accepted an unknown option"
 "$WRAPPER" check --offline >/dev/null 2>&1 && fail "wrapper allowed --check-only --offline"
@@ -343,5 +344,88 @@ printf '{"fetched_at":"2026-01-01T00:00:00Z"}\n' > "$WORK/probe-cache/last-run.j
 "$WRAPPER" check --cache "$WORK/probe-cache" --probe-json "$WORK/probe.json" \
     >/dev/null 2>&1 && fail "wrapper check should exit 3 when changes exist"
 ok "the wrapper rejects bad flags and exits 0/3 from check"
+
+# --- gridpane-kb-docs.sh: status, list, extract, prune ----------------------
+
+KBC="$WORK/kbcli"
+mkdir -p "$KBC/2026-01-01" "$KBC/2026-01-02"
+
+cat > "$KBC/2026-01-01/manifest.json" <<'JSON'
+{"schema":2,"source":"api","fetched_at":"2026-01-01T00:00:00Z","count":2,"entries":[
+ {"url":"https://gridpane.com/kb/alpha/","title":"Alpha","modified":"2026-01-01T00:00:00","sha256":"a1"},
+ {"url":"https://gridpane.com/kb/beta/","title":"Beta","modified":"2026-01-01T00:00:00","sha256":"b1"}]}
+JSON
+cat > "$KBC/2026-01-02/manifest.json" <<'JSON'
+{"schema":2,"source":"api","fetched_at":"2026-01-02T00:00:00Z","count":3,"entries":[
+ {"url":"https://gridpane.com/kb/alpha/","title":"Alpha","modified":"2026-01-02T00:00:00","sha256":"a2"},
+ {"url":"https://gridpane.com/kb/beta/","title":"Beta","modified":"2026-01-01T00:00:00","sha256":"b1"},
+ {"url":"https://gridpane.com/kb/gamma/","title":"Gamma","modified":"2026-01-02T00:00:00","sha256":"g1"}]}
+JSON
+ln -s 2026-01-02 "$KBC/latest"
+cp "$KBC/2026-01-01/manifest.json" "$WORK/kbcli-manifest.json"
+
+cat > "$KBC/2026-01-02/api-page-1.json" <<'JSON'
+[{"slug": "alpha", "link": "https://gridpane.com/kb/alpha/",
+  "modified_gmt": "2026-01-02T00:00:00", "date_gmt": "2026-01-01T00:00:00",
+  "kbcategories": [10], "title": {"rendered": "Alpha"},
+  "content": {"rendered": "<style>.x{font-size:1px}</style><p>Alpha body</p>"}}]
+JSON
+
+out="$("$CLI" status --cache "$KBC" --manifest "$WORK/kbcli-manifest.json")" \
+    || fail "status failed on the fixture"
+grep -q 'ingested  *2 articles' <<<"$out" || fail "status ingested count is wrong"
+grep -q 'cached  *3 articles' <<<"$out" || fail "status cached count is wrong"
+grep -q 'extracted  *0 articles' <<<"$out" || fail "status extracted count is wrong"
+grep -q 'drift  *1 added, 0 removed, 1 changed, 0 title-only' <<<"$out" \
+    || fail "status drift is wrong"
+grep -q '2026-01-02' <<<"$out" || fail "status snapshot table is missing"
+ok "status counts ingested, cached, extracted and drift"
+
+"$CLI" status --json --cache "$KBC" --manifest "$WORK/kbcli-manifest.json" \
+    | jq -e '.ingested.count == 2 and .cached.count == 3 and .extracted.count == 0
+             and .drift == {added:1,removed:0,changed:1,title_changed:0}
+             and (.snapshots | length) == 2' >/dev/null \
+    || fail "status --json fields are wrong"
+ok "status --json reports the same numbers"
+
+[[ "$("$CLI" list --limit 1 --cache "$KBC" | wc -l | tr -d ' ')" -eq 1 ]] \
+    || fail "list --limit did not cap the rows"
+rows="$("$CLI" list --filter beta --cache "$KBC")"
+[[ "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" -eq 1 ]] || fail "list --filter row count"
+grep -q '^beta' <<<"$rows" || fail "list --filter returned the wrong row"
+"$CLI" list --json --cache "$KBC" | jq -e '.count == 3' >/dev/null \
+    || fail "list --json count is wrong"
+ok "list caps, filters and reports JSON"
+
+"$CLI" extract --slug alpha --format markdown --cache "$KBC" >/dev/null 2>&1 \
+    || fail "extract failed"
+[[ -f "$KBC/2026-01-02/alpha.md" ]] || fail "extract wrote no file"
+grep -q 'Alpha body' "$KBC/2026-01-02/alpha.md" || fail "extract lost the body"
+grep -q 'font-size' "$KBC/2026-01-02/alpha.md" && fail "extract kept inline CSS"
+status_out="$("$CLI" status --cache "$KBC" --manifest "$WORK/kbcli-manifest.json")"
+grep -q 'extracted  *1 articles' <<<"$status_out" \
+    || fail "status did not see the extracted file"
+ok "extract writes into the newest snapshot and status sees it"
+
+before="$(find "$KBC" -maxdepth 1 -type d -name '2026-*' | wc -l | tr -d ' ')"
+out="$("$CLI" prune --keep 1 --cache "$KBC" 2>&1)"
+grep -q 'removing: 2026-01-01' <<<"$out" || fail "prune dry run did not list the candidate"
+[[ "$(find "$KBC" -maxdepth 1 -type d -name '2026-*' | wc -l | tr -d ' ')" -eq "$before" ]] \
+    || fail "prune dry run removed a snapshot"
+
+"$CLI" prune --keep 1 --yes --cache "$KBC" >/dev/null 2>&1 || fail "prune --yes failed"
+[[ "$(find "$KBC" -maxdepth 1 -type d -name '2026-*' | wc -l | tr -d ' ')" -eq 1 ]] \
+    || fail "prune --yes did not leave exactly one snapshot"
+[[ -d "$KBC/2026-01-02" ]] || fail "prune removed the newest snapshot"
+"$CLI" prune --keep 0 --cache "$KBC" >/dev/null 2>&1 && fail "prune accepted --keep 0"
+ok "prune is a dry run until --yes and keeps the newest snapshot"
+
+"$CLI" >/dev/null 2>&1 && fail "a bare invocation should exit 2"
+"$CLI" nonsense >/dev/null 2>&1 && fail "an unknown command should exit 2"
+"$CLI" list --cache "$WORK/nocache" >/dev/null 2>&1 && fail "list with no snapshot should fail"
+out="$("$CLI" status --cache "$WORK/nocache" --manifest "$WORK/nomanifest.json" 2>&1)" \
+    || fail "status should exit 0 with nothing cached"
+grep -q 'hint:' <<<"$out" || fail "status printed no hint for the empty state"
+ok "the CLI fails clearly and status degrades with a hint"
 
 printf 'All scrape-docs tests passed.\n'
