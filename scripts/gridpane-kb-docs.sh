@@ -40,7 +40,15 @@ OFFLINE=0
 REMOTE=0
 FORCE=0
 JSON_OUT=0
+FILTER=""
+LIMIT=""
+SLUG=""
+EXTRACT_ALL=0
+FORMAT=""
+KEEP=""
+YES=0
 PASSTHRU=()
+POSITIONAL=()
 
 usage() {
     cat <<EOF
@@ -54,12 +62,25 @@ Commands:
                       list and drift. Local only unless --remote adds one probe
   check               One request: exit 0 unchanged, 3 changed
   refresh             Probe, index a new snapshot, diff, publish the manifest
+  list                Articles in the newest snapshot, newest first
+  search QUERY        One-request lookup against the live KB
+  diff [PREV]         What changed between two snapshots
+  extract             Cached article body as text or markdown
+  prune               Remove old snapshots (dry run unless --yes)
   help                Show this help and exit
 
 Options:
   --offline           refresh: skip the probe and rebuild from the newest snapshot
   --force             refresh: pass --force to the indexer (accept a count drop)
-  --json              check/refresh: print a JSON object instead of plain lines
+  --json              Print JSON instead of plain lines (status, check, refresh,
+                      list, search, diff, prune)
+  --filter TEXT       list: keep rows whose slug or title contains TEXT
+  --limit N           list/search: at most N rows (list default 20)
+  --slug SLUG         extract: the article to convert
+  --all               extract: convert every article in the snapshot
+  --format text|markdown  extract: output format (default markdown)
+  --keep N            prune: snapshots to keep, newest first (default 5)
+  --yes               prune: actually delete; without it nothing is removed
   --manifest FILE     refresh: publish to this path instead of the committed one
   -h, --help          Show this help and exit
 
@@ -84,6 +105,18 @@ while [[ $# -gt 0 ]]; do
         --remote)     REMOTE=1; shift ;;
         --force)      FORCE=1; shift ;;
         --json)       JSON_OUT=1; shift ;;
+        --filter)     FILTER="${2:?--filter needs a value}"; shift 2 ;;
+        --filter=*)   FILTER="${1#--filter=}"; shift ;;
+        --limit)      LIMIT="${2:?--limit needs a value}"; shift 2 ;;
+        --limit=*)    LIMIT="${1#--limit=}"; shift ;;
+        --slug)       SLUG="${2:?--slug needs a value}"; shift 2 ;;
+        --slug=*)     SLUG="${1#--slug=}"; shift ;;
+        --all)        EXTRACT_ALL=1; shift ;;
+        --format)     FORMAT="${2:?--format needs a value}"; shift 2 ;;
+        --format=*)   FORMAT="${1#--format=}"; shift ;;
+        --keep)       KEEP="${2:?--keep needs a value}"; shift 2 ;;
+        --keep=*)     KEEP="${1#--keep=}"; shift ;;
+        --yes)        YES=1; shift ;;
         --manifest)   MANIFEST="${2:?--manifest needs a value}"; shift 2 ;;
         --manifest=*) MANIFEST="${1#--manifest=}"; shift ;;
         -h|--help)    usage; exit 0 ;;
@@ -94,7 +127,8 @@ while [[ $# -gt 0 ]]; do
         --base=*|--cache=*|--snapshot=*|--probe-json=*)
             PASSTHRU+=("$1"); shift ;;
         --allow-fast) PASSTHRU+=("$1"); shift ;;
-        *) log "error: unknown option: $1"; usage >&2; exit 2 ;;
+        -*) log "error: unknown option: $1"; usage >&2; exit 2 ;;
+        *)  POSITIONAL+=("$1"); shift ;;
     esac
 done
 
@@ -461,12 +495,156 @@ cmd_refresh() {
     fi
 }
 
+# --- list -------------------------------------------------------------------
+
+cmd_list() {
+    local snap="${1:-}" limit="${LIMIT:-20}" entries json
+
+    [[ "$limit" =~ ^[0-9]+$ ]] || die "--limit must be a number"
+    snap="$(latest_snapshot)" || die "no cached snapshot; run: ${SCRIPT_NAME} refresh"
+
+    entries="$(jq -r --arg f "$FILTER" --argjson n "$limit" '
+        [ .entries[]
+          | select($f == ""
+                   or ((.url | ascii_downcase) | contains($f | ascii_downcase))
+                   or ((.title | ascii_downcase) | contains($f | ascii_downcase))) ]
+        | sort_by(.url) | .[0:$n]
+        | .[]
+        | [ (.url | sub(".*/kb/"; "") | sub("/$"; "")), .modified, .url, .title ]
+        | @tsv' "$snap/manifest.json")"
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        json="$(jq -n --arg snapshot "$(basename "$snap")" --arg filter "$FILTER" \
+            --argjson limit "$limit" --arg tsv "$entries" '
+            ($tsv | split("\n") | map(select(length > 0) | split("\t") | {
+                slug: .[0], modified: .[1], url: .[2], title: .[3]
+            })) as $rows
+            | {snapshot: $snapshot, filter: $filter, limit: $limit,
+               count: ($rows | length), entries: $rows}')"
+        printf '%s\n' "$json"
+    else
+        printf '%s\n' "$entries"
+    fi
+}
+
+# --- search -----------------------------------------------------------------
+
+cmd_search() {
+    local query="${POSITIONAL[0]:-}"
+    local -a args=(--search "$query")
+
+    [[ -n "$query" ]] || die "search needs a query"
+    [[ -n "$LIMIT" ]] && args+=(--limit "$LIMIT")
+    [[ "$JSON_OUT" -eq 1 ]] && args+=(--json)
+    "$SCRAPER" "${args[@]}" "${PASSTHRU[@]}"
+}
+
+# --- diff -------------------------------------------------------------------
+
+cmd_diff() {
+    local -a args=(--diff)
+
+    [[ -n "${POSITIONAL[0]:-}" ]] && args+=("${POSITIONAL[0]}")
+    [[ "$JSON_OUT" -eq 1 ]] && args+=(--json)
+    (cd "$ROOT" && "$SCRAPER" "${args[@]}" "${PASSTHRU[@]}")
+}
+
+# --- extract ----------------------------------------------------------------
+
+cmd_extract() {
+    local -a args=()
+
+    if [[ "$EXTRACT_ALL" -eq 1 ]]; then
+        args+=(--all)
+    else
+        [[ -n "$SLUG" ]] || die "extract needs --slug SLUG or --all"
+        args+=(--slug "$SLUG")
+    fi
+    [[ -n "$FORMAT" ]] && args+=(--format "$FORMAT")
+    "$SCRAPER" "${args[@]}" "${PASSTHRU[@]}"
+}
+
+# --- prune ------------------------------------------------------------------
+
+# Snapshots are regenerable, but they are also the change history, so this is a
+# dry run unless --yes is given, it never removes the newest snapshot, and it
+# never removes the one `latest` points at.
+cmd_prune() {
+    local keep="${KEEP:-5}" target="" name i count=0 kept=0 freed=0
+    local -a all=() remove=()
+    local -a keep_names=()
+
+    [[ "$keep" =~ ^[0-9]+$ ]] || die "--keep must be a number"
+    [[ "$keep" -ge 1 ]] || die "--keep must be at least 1"
+
+    while IFS= read -r name; do
+        [[ -n "$name" ]] && all+=("$name")
+    done < <(snapshot_names | sort -r)
+
+    target="$(latest_snapshot || true)"
+    target="${target##*/}"
+
+    for ((i = 0; i < ${#all[@]}; i++)); do
+        name="${all[$i]}"
+        if [[ "$i" -lt "$keep" || "$name" == "$target" ]]; then
+            keep_names+=("$name")
+            kept=$((kept + 1))
+        else
+            remove+=("$name")
+        fi
+    done
+
+    if [[ ${#all[@]} -eq 0 ]]; then
+        printf 'nothing to prune: no completed snapshots in %s\n' "${CACHE#"$ROOT"/}"
+        return 0
+    fi
+
+    if [[ ${#remove[@]} -eq 0 ]]; then
+        printf 'nothing to prune: %s snapshots, keeping %s\n' "${#all[@]}" "$keep"
+        return 0
+    fi
+
+    for name in "${remove[@]}"; do
+        count=$((count + $(du -sb "$CACHE/$name" 2>/dev/null | cut -f1)))
+    done
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        jq -n --argjson keep "$keep" --argjson removed "$YES" \
+            --argjson freed "$count" \
+            --arg keep_names "$(printf '%s\n' "${keep_names[@]}")" \
+            --arg remove_names "$(printf '%s\n' "${remove[@]}")" '
+            def lines: split("\n") | map(select(length > 0));
+            {keep: $keep, removed: ($removed == 1),
+             snapshots_kept: ($keep_names | lines),
+             snapshots_removed: ($remove_names | lines),
+             freed_bytes: (if $removed == 1 then $freed else 0 end)}'
+    else
+        printf 'keeping: %s\n' "$(printf '%s ' "${keep_names[@]}")"
+        printf 'removing: %s\n' "$(printf '%s ' "${remove[@]}")"
+    fi
+
+    if [[ "$YES" -eq 1 ]]; then
+        for name in "${remove[@]}"; do
+            rm -rf "${CACHE:?}/$name"
+        done
+        freed="$count"
+        log "pruned ${#remove[@]} snapshot(s), freed $(human_size "$freed")"
+    else
+        log "dry run: ${#remove[@]} snapshot(s), $(human_size "$count") would be freed; rerun with --yes"
+    fi
+}
+
 # --- dispatch ---------------------------------------------------------------
 
 case "$COMMAND" in
     status)  cmd_status ;;
     check)   cmd_check ;;
     refresh) cmd_refresh ;;
+    list)    cmd_list ;;
+    search)  cmd_search ;;
+    diff)    cmd_diff ;;
+    extract) cmd_extract ;;
+    prune)   cmd_prune ;;
     help)    usage; exit 0 ;;
     "")      usage >&2; exit 2 ;;
     *)       log "error: unknown command: $COMMAND"; usage >&2; exit 2 ;;
