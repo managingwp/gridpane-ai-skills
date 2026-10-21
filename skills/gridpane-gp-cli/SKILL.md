@@ -115,7 +115,7 @@ Every [WRITE] command above includes its rollback. General rules:
   `gpbup {site} -run-single-site local` only queues the job (task-spooler socket
   `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
   site the queued run backs up nothing and still exits 0. See
-  `references/command-reference.md` before relying on either.
+  `references/backups.md` before relying on either.
 - **A local backup cron can exist while local backups are off.**
   `-set-backup-schedule` writes the cron when *any* backup type is enabled, so
   `Remote-Backups:ON` plus `Local-Backups:OFF` still leaves a daily local cron
