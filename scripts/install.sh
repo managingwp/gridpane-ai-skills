@@ -98,14 +98,17 @@ install_one() {
     fi
 }
 
+installed=0
 for name in "${selected[@]}"; do
     [[ -z "$name" ]] && continue
-    [[ "$name" == _* ]] && continue
+    [[ "$name" == _* ]] && continue   # never install the template
     if [[ "$name" == "gridpane-core" ]]; then
         continue
     fi
     install_one "$name"
+    installed=$(( installed + 1 ))
 done
 install_one "gridpane-core"
+installed=$(( installed + 1 ))
 
-printf '\nInstalled %d skill(s) into %s\n' "$(( ${#selected[@]} ))" "$TARGET"
+printf '\nInstalled %d skill(s) into %s\n' "$installed" "$TARGET"

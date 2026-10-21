@@ -34,13 +34,25 @@ while IFS= read -r skill_md; do
     skill_dir="$(dirname "$skill_md")"
     folder="$(basename "$skill_dir")"
 
-    [[ "$folder" == _* ]] && continue   # skip _template
-
     # Frontmatter block: lines between the first two "---" lines.
     fm="$(awk 'NR==1 && $0=="---" {f=1; next} f && $0=="---" {exit} f {print}' "$skill_md")"
     if [[ -z "$fm" ]]; then
         error "$skill_md: missing or empty frontmatter"
         continue
+    fi
+
+    # `npx skills` discovery: a skill marked `metadata.internal: true` is hidden
+    # from `npx skills add --list`. Scaffolds under skills/_* must carry it; a
+    # real skill must not, or it silently disappears from the published package.
+    internal_marker="$(printf '%s\n' "$fm" | grep -cE '^[[:space:]]+internal:[[:space:]]*true[[:space:]]*$' || true)"
+    if [[ "$folder" == _* ]]; then
+        if [[ "$internal_marker" -eq 0 ]]; then
+            error "$skill_md: scaffold must set 'metadata.internal: true' so npx skills ignores it"
+        fi
+        continue
+    fi
+    if [[ "$internal_marker" -gt 0 ]]; then
+        error "$skill_md: 'metadata.internal: true' hides a real skill from npx skills; remove it"
     fi
 
     name="$(printf '%s\n' "$fm" | awk -F':[[:space:]]*' '/^name:/{print $2; exit}' | tr -d ' "')"

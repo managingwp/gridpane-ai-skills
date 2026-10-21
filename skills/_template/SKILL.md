@@ -4,6 +4,8 @@ description: >-
   TEMPLATE ONLY. Replace this with a real skill. Use when <situation the user is
   in>, <second situation>. Covers <what it does> for GridPane servers. Do not use
   for <sibling case handled elsewhere>.
+metadata:
+  internal: true
 ---
 
 # gridpane-example
@@ -13,6 +15,10 @@ should reach. Name the sibling skill when another is a better fit.
 
 > Folder name must equal the `name` in the frontmatter. Rename the folder and
 > the frontmatter together. Keep the description at or under 1024 characters.
+>
+> `metadata.internal: true` keeps this skeleton out of `npx skills` discovery.
+> Delete it when you rename the folder to a real `gridpane-<name>` skill:
+> `scripts/lint-skills.sh` rejects a real skill that carries the marker.
 
 ## Prerequisites
 
