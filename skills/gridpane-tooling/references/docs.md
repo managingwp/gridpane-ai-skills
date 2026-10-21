@@ -29,6 +29,17 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --offline \
 - `--offline` reads pages from the cache, so tests and re-runs never hit the
   network.
 
+Look up an article without building or reading a manifest — one request against
+the same REST route:
+
+```bash
+# [READ] Search the KB; prints slug, modified, url, title, newest first.
+skills/gridpane-tooling/scripts/scrape-docs.sh --search 'fastcgi cache' --limit 5
+```
+
+`--json` emits the raw result array for `jq`. A query never touches the cache,
+so `--search` refuses `--out` and `--offline`.
+
 ### Manifest schema
 
 `references/docs-manifest.json` is a JSON array; one object per `/kb/` page:

@@ -30,7 +30,9 @@
 #   --cache DIR          Cache directory (default out/gridpane-docs-cache)
 #   --page-size N        API page size, capped at 100 (default 100)
 #   --since DATE         API only: pass modified_after=DATE (incremental refresh)
-#   --limit N            Only process the first N entries
+#   --limit N            Only process the first N entries (search: result cap)
+#   --search QUERY       One-request KB lookup: print slug/modified/url/title
+#   --json               With --search: emit the raw result array instead of TSV
 #   --delay SECONDS      Delay between fetches (default 1)
 #   --offline            Do not fetch; read pages from the cache only
 #   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -52,6 +54,8 @@ LIMIT=0
 DELAY=1
 OFFLINE=0
 CONVERT=1
+SEARCH=""
+JSON_OUT=0
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -74,7 +78,9 @@ Options:
   --cache DIR          Cache directory (default ${CACHE})
   --page-size N        API page size, capped at 100 (default ${PAGE_SIZE})
   --since DATE         API only: pass modified_after=DATE (incremental refresh)
-  --limit N            Only process the first N entries
+  --limit N            Only process the first N entries (search: result cap)
+  --search QUERY       One-request KB lookup: print slug, modified, url, title
+  --json               With --search: emit the raw result array instead of TSV
   --delay SECONDS      Delay between fetches (default ${DELAY})
   --offline            Do not fetch; read pages from the cache only
   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -123,6 +129,46 @@ decode_entities() {
         -e 's/&nbsp;/ /g' -e 's/&amp;/\&/g'
 }
 
+# --- search -----------------------------------------------------------------
+
+# One request, no crawl. The query is URL-encoded through jq so a space or a
+# quote in the search term cannot break the URL.
+search_kb() {
+    local enc per url json count slug modified link title
+    enc="$(jq -rn --arg q "$SEARCH" '$q|@uri')"
+    per="$LIMIT"
+    if [[ "$per" -le 0 ]]; then
+        per=20
+    elif [[ "$per" -gt 100 ]]; then
+        per=100
+    fi
+
+    url="$BASE/wp-json/wp/v2/kb?search=$enc&per_page=$per"
+    url="$url&_fields=slug,link,title,modified,kbcategories"
+
+    if ! json="$(curl -fsSL --retry 3 --max-time 30 -A "$UA" "$url")"; then
+        die "search request failed: $url"
+    fi
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        jq 'sort_by(.modified) | reverse' <<<"$json"
+        return 0
+    fi
+
+    count="$(jq 'length' <<<"$json")"
+    if [[ "$count" -eq 0 ]]; then
+        log "no matches"
+        return 0
+    fi
+
+    while IFS=$'\t' read -r slug modified link title; do
+        title="$(printf '%s' "$title" | decode_entities)"
+        printf '%s\t%s\t%s\t%s\n' "$slug" "$modified" "$link" "$title"
+    done < <(jq -r 'sort_by(.modified) | reverse | .[]
+        | [.slug, .modified, .link, (.title.rendered // "")]
+        | @tsv' <<<"$json")
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --source)      SOURCE="${2:?--source needs a value}"; shift 2 ;;
@@ -133,6 +179,8 @@ while [[ $# -gt 0 ]]; do
         --page-size)   PAGE_SIZE="${2:?--page-size needs a value}"; shift 2 ;;
         --since)       SINCE="${2:?--since needs a value}"; shift 2 ;;
         --limit)       LIMIT="${2:?--limit needs a value}"; shift 2 ;;
+        --search)      SEARCH="${2:?--search needs a value}"; shift 2 ;;
+        --json)        JSON_OUT=1; shift ;;
         --delay)       DELAY="${2:?--delay needs a value}"; shift 2 ;;
         --offline)     OFFLINE=1; shift ;;
         --no-convert)  CONVERT=0; shift ;;
@@ -151,6 +199,30 @@ if [[ "$PAGE_SIZE" -gt 100 ]]; then
     PAGE_SIZE=100
 fi
 [[ "$PAGE_SIZE" -gt 0 ]] || die "--page-size must be greater than 0"
+[[ "$LIMIT" =~ ^[0-9]+$ ]] || die "--limit must be a number"
+have jq || die "jq is required"
+
+if [[ -n "$SEARCH" ]]; then
+    if [[ "$SOURCE" != "api" ]]; then
+        log "error: --search needs --source api"
+        exit 2
+    fi
+    if [[ -n "$OUT" ]]; then
+        log "error: --search cannot be combined with --out"
+        exit 2
+    fi
+    if [[ "$OFFLINE" -eq 1 ]]; then
+        log "error: --search cannot be combined with --offline"
+        exit 2
+    fi
+    search_kb
+    exit 0
+fi
+
+if [[ "$JSON_OUT" -eq 1 ]]; then
+    log "error: --json needs --search"
+    exit 2
+fi
 
 mkdir -p "$CACHE"
 FETCHED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
