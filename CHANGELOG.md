@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
   `status` reports how many articles are ingested (the committed manifest),
-  cached (the newest snapshot) and extracted, plus the drift between them,
-  without touching the network; `check` answers "did anything change?" in one
-  request (exit 3 when it did); `refresh` probes, indexes a new dated snapshot,
-  diffs it against the previous one, and publishes `references/docs-manifest.json`
-  only when its content changed.
+  cached (the newest snapshot) and extracted, plus the drift between them, the
+  newest article and the snapshot list — without touching the network, and with
+  `--json` and an optional one-request `--remote` check; `check` answers "did
+  anything change?" in one request (exit 3 when it did); `refresh` probes,
+  indexes a new dated snapshot, diffs it against the previous one, and publishes
+  `references/docs-manifest.json` only when its content changed. `list` browses
+  the cached articles, `search` queries the live KB, `diff` compares snapshots,
+  `extract` converts a body to text or markdown, and `prune` removes old
+  snapshots (dry run unless `--yes`).
 - `gridpane-tooling/scripts/scrape-docs.sh --search`: one-request KB lookup
   against the WordPress REST feed (`--json` for the raw array); a query refuses
   `--out`/`--offline` and reports `no matches` without failing.

@@ -157,32 +157,78 @@ post edited while the previous run was still fetching is not missed.
 skills/gridpane-tooling/scripts/scrape-docs.sh --since-last --out /tmp/kb-delta.json
 ```
 
-### Refresh workflow
+### KB management
 
-`scripts/gridpane-kb-docs.sh` chains the steps for the routine refresh:
+`scripts/gridpane-kb-docs.sh` is the entry point for the KB: it wraps
+`scrape-docs.sh` (the fetch, diff and extract engine) and manages the snapshots.
+Eight subcommands; only `check`, `refresh` and `status --remote` touch the
+network.
 
 ```bash
-# [READ] One request. Exit 0 = nothing changed, 3 = something did.
+# [READ] Local state only: what is ingested, cached, extracted and drifted.
+scripts/gridpane-kb-docs.sh status
+```
+
+```bash
+# [READ] One request: exit 0 when the KB has not moved, 3 when it has.
 scripts/gridpane-kb-docs.sh check
 ```
 
 ```bash
-# [READ] Probe, index into a new snapshot, diff, publish the manifest if changed.
+# [READ] Refresh: probe, index a new snapshot, diff, publish the manifest.
 scripts/gridpane-kb-docs.sh refresh
 ```
 
-- Exit codes: `0` done or nothing to do, `3` `--check-only` found changes, `2`
-  usage error, `1` failure.
-- `--offline` skips the probe and rebuilds from the newest snapshot;
-  `--manifest FILE` publishes somewhere else (fixtures); `--json` prints a
-  summary object. `--base`, `--cache`, `--snapshot`, `--partial` and
-  `--allow-fast` pass through to the scraper.
-- It publishes with `cp`+`mv` to the committed manifest only when the content
-  changed, and keeps an entry's `fetched_at` when its `sha256` and title are
-  unchanged — the committed file only moves where the KB did. `--offline`
-  republishes from the newest snapshot without fetching.
+```bash
+# [READ] Browse and query the cache.
+scripts/gridpane-kb-docs.sh list --filter monit --limit 10
+scripts/gridpane-kb-docs.sh search fastcgi --limit 5
+scripts/gridpane-kb-docs.sh diff 2026-10-01
+scripts/gridpane-kb-docs.sh extract --slug migrately --format markdown
+```
+
+```bash
+# [WRITE] Remove old snapshots. Dry run unless --yes is given.
+scripts/gridpane-kb-docs.sh prune --keep 5
+scripts/gridpane-kb-docs.sh prune --keep 5 --yes
+```
+
+| Command | Network | What it does |
+|---|---|---|
+| `status` | no (`--remote`: one request) | Ingested, cached, extracted, drift, newest article, snapshot list |
+| `check` | one request | Exit 0 unchanged, 3 changed; for automation |
+| `refresh` | probe + 6 requests when it indexes | Probe, index a dated snapshot, diff, publish the manifest |
+| `list` | no | Articles in the newest snapshot (`--filter`, `--limit`, `--json`) |
+| `search QUERY` | one request | Live KB lookup (`--limit`, `--json`) |
+| `diff [PREV]` | no | Added/removed/changed/title-only between two snapshots |
+| `extract` | no | `--slug SLUG` or `--all`, `--format text\|markdown` |
+| `prune` | no | Remove old snapshots (`--keep N`, `--yes`); never the newest |
+
+The three counts `status` reports, so the numbers are unambiguous:
+
+| Count | Means |
+|---|---|
+| ingested | Articles in the committed manifest, `references/docs-manifest.json` — what the skills actually carry |
+| cached | Articles in the newest completed snapshot under `out/gridpane-docs-cache/<YYYY-MM-DD>[-N]/` |
+| extracted | `.md` files in that snapshot, produced by `extract` |
+| drift | Manifest versus snapshot: added, removed, body-changed, title-only |
+
+Notes:
+
+- Exit codes: `0` done or nothing to do, `3` `check` found changes, `2` usage
+  error, `1` failure. A bare invocation prints usage and exits 2.
+- `refresh` accepts `--offline` (rebuild from the newest snapshot without
+  fetching), `--force` (accept a count drop) and `--manifest FILE` (publish
+  elsewhere); `--json` is available on `status`, `check`, `refresh`, `list`,
+  `search`, `diff` and `prune`. `--base`, `--cache`, `--snapshot`, `--partial`
+  and `--allow-fast` pass through to the scraper.
+- Publishing keeps an entry's `fetched_at` when its `sha256` and title are
+  unchanged, so the committed manifest only moves where the KB did.
 - The index's own guards run unchanged: a count drop or an `X-WP-Total`
   mismatch aborts before anything is published.
+- `prune` is the only destructive subcommand. It skips the newest snapshot and
+  the one `latest` points at, refuses `--keep 0`, and deletes nothing without
+  `--yes`.
 
 ### Date model
 

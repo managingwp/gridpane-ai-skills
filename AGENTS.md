@@ -89,7 +89,13 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 
 ### Refreshing KB facts
 
-Before shipping a change that cites GridPane knowledge-base facts, check whether the KB moved, and re-read only what it reports:
+Start with `status`: it reads only local state and tells you how much of the KB
+the skills carry, how much is cached, and whether the two have drifted.
+
+```bash
+# [READ] Local state only: ingested, cached, extracted and drift counts.
+scripts/gridpane-kb-docs.sh status
+```
 
 ```bash
 # [READ] One request. Exit 0 = nothing changed, 3 = something did.
@@ -103,7 +109,7 @@ scripts/gridpane-kb-docs.sh refresh
 
 - The wrapper runs `scrape-docs.sh` with its defaults: **10 seconds between live requests**, a count guard against the previous snapshot, and a hard failure when the manifest disagrees with the API's `X-WP-Total`. It copies the new manifest to `skills/gridpane-tooling/references/docs-manifest.json` only when the content actually changed.
 - Snapshots and page text live in the gitignored `out/gridpane-docs-cache/<YYYY-MM-DD>/`; the manifest is the only artifact that reaches git. See `skills/gridpane-tooling/references/docs.md`.
-- Read the diff, then update the reference files that cite the changed pages. Do not re-verify pages the diff did not report.
+- Read the diff, then update the reference files that cite the changed pages. Do not re-verify pages the diff did not report. `list --filter TEXT` and `search QUERY` find the article behind a change; `diff` and `prune` compare and trim snapshots.
 
 ## Writing style
 
