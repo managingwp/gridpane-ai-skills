@@ -15,7 +15,7 @@ These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or 
 | `gridpane-core` | Any GridPane task. Covers stack layout, paths, the `gp` CLI conventions and the safety protocol. Other skills depend on it. | Read |
 | `gridpane-incident-triage` | A site is down, slow, throwing 502/504/500, or a server alert fired | Read → Write |
 | `gridpane-server-diagnostics` | Checking load, PHP workers (PHP-FPM on Nginx, LSAPI on OLS), MySQL/MariaDB, Redis, disk, logs and services | Read |
-| `gridpane-gp-cli` | Running or explaining `gp` commands for sites, stack, PHP, caching and backups | Read / Write |
+| `gridpane-gp-cli` | Running or explaining `gp` commands for sites, stack, PHP, caching and backups, including backup troubleshooting (spinner, no-op schedules) | Read / Write |
 | `gridpane-nginx-config` | Adding or reviewing custom Nginx includes or OpenLiteSpeed `ols/` headers, rewrites and IP allow/deny | Write |
 | `gridpane-wordpress` | WP-CLI as the site user, caching (FastCGI / Redis Page / Object / LSCache), cron, staging and migrations | Read / Write |
 | `gridpane-security` | 7G/6G WAF (6G is Nginx-only), ModSecurity, Fail2ban, Cloudflare real-IP/proxy setup, and compromised-site first response | Read / Write |

@@ -9,9 +9,11 @@ should_trigger:
   - "what gp flags affect every site on the server"
   - "what does gpbup example.com -run-single-site local do"
   - "did our scheduled local backup actually run for example.com"
+  - "the backup button in gridpane has been spinning for example.com for an hour"
 
 should_not_trigger:
   - "clear all caches for example.com and check redis is being used"
   - "our gridpane server is at 100% disk, find out why"
   - "list every site in our gridpane account with its php version"
   - "how do I write a systemd service on ubuntu"
+  - "restore example.com from yesterday's backup"

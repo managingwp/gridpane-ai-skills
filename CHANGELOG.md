@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `gridpane-gp-cli`: backup behaviour moved out of the command table into
+  `references/backups.md` (entry points and tags, toggles and schedules, disk
+  threshold, both lock files, the shared task-spooler queue, the completion
+  callback, the one-off local recipe, and the log files); `command-reference.md`
+  keeps the labelled table and links to it. `gridpane-incident-triage` routes
+  backup failures and the spinning-button symptom there, `tests/safety-review.md`
+  inventories the backup-state writes, and `OPEN-QUESTIONS.md` records the
+  unverified parts plus a proposal for restore coverage.
 - Install path: the repository is a `npx skills` package. `npx skills add
   managingwp/gridpane-ai-skills` installs the nine production skills into an
   agent (Claude Code, Codex, OpenCode, …), with `update`/`remove`/`list` handled

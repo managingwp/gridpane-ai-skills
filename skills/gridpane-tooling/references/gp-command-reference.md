@@ -125,6 +125,12 @@ must already be sourced from `lib/`). `function-test` is the same with a printed
 header. Useful for debugging a module; dangerous in the wrong hands, since it can
 call any function, including mutating ones.
 
+Worked example: `gp -function-run 'gpbup::callback::manual_backup_status 1
+{site} local'` posts the backup completion callback that re-enables the panel's
+backup buttons — see `gridpane-gp-cli/references/backups.md` for when that is
+legitimate. The `callback` area is the same transport used directly:
+`gp callback /backups/backup -- site_url=… status=failed service=local`.
+
 ## Wrappers
 
 | Wrapper | Equivalent |

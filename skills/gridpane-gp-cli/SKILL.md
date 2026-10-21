@@ -133,7 +133,8 @@ Every [WRITE] command above includes its rollback. General rules:
 - GP WP-CLI and Regular WP-CLI — https://gridpane.com/kb/gp-wp-cli/
 - Useful Commands — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 
-See `references/command-reference.md` for the verified command set and
+See `references/command-reference.md` for the verified command set,
+`references/backups.md` for backup behaviour and troubleshooting, and
 `gridpane-core/references/sources.md` for the rest.
 
 Last verified: 2026-10-21
