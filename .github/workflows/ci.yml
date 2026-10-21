@@ -17,6 +17,31 @@ jobs:
           shellcheck "${scripts[@]}"
       - name: Lint skills
         run: ./scripts/lint-skills.sh
+      - name: Skills discovery
+        # Guards the published npx skills surface: the CLI must offer every real
+        # skill under skills/ and nothing else (no _template scaffold). Reads the
+        # local checkout only — no install, no credentials. Bump the pinned CLI
+        # version together with the README commands.
+        env:
+          SKILLS_CLI_VERSION: '1.7.4'
+        run: |
+          set -euo pipefail
+          out="$(npx -y "skills@${SKILLS_CLI_VERSION}" add . --list 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g')"
+          printf '%s\n' "$out"
+          expected="$(find skills -mindepth 2 -maxdepth 2 -name SKILL.md -not -path 'skills/_*' -printf '%h\n' | xargs -n1 basename | sort)"
+          actual="$(printf '%s\n' "$out" | sed -e 's/^[^A-Za-z0-9_]*//' | grep -E '^gridpane-[a-z0-9-]+$' | sort -u)"
+          expected_count="$(printf '%s\n' "$expected" | grep -c .)"
+          printf '\ndiscovered %s skill(s): %s\n' "$expected_count" "$(printf '%s' "$expected" | tr '\n' ' ')"
+          if ! diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual"); then
+            printf 'discovery does not match skills/*/SKILL.md\n' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$actual" | grep -qx 'gridpane-example'; then
+            printf 'scaffold exposed as gridpane-example\n' >&2
+            exit 1
+          fi
+          test "$expected_count" -ge 1
+          printf 'discovery ok: %s skills, no scaffold\n' "$expected_count"
       - name: Run script tests
         run: |
           ./tests/scripts/test_gp_api.sh
