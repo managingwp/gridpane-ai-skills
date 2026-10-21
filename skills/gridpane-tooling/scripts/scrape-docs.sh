@@ -37,6 +37,8 @@
 #   --format text|markdown  With --slug/--all: extract a cached body to text
 #   --slug SLUG          Extract one article (by WordPress slug) into the cache
 #   --all                Extract every slug present in the cached API pages
+#   --dry-run            Print the request URL(s) and exit without fetching
+#   --search-json FILE   With --search: read a saved response instead of fetching
 #   --delay SECONDS      Delay between fetches (default 1)
 #   --offline            Do not fetch; read pages from the cache only
 #   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -63,6 +65,8 @@ JSON_OUT=0
 SLUG=""
 EXTRACT_ALL=0
 FORMAT=""
+DRY_RUN=0
+SEARCH_JSON=""
 UA="gridpane-ai-skills-docs-scraper/1.1 (+https://github.com/managingwp/gridpane-ai-skills)"
 
 WP_TOTAL=""
@@ -91,6 +95,8 @@ Options:
   --format text|markdown  With --slug/--all: extract a cached body to text
   --slug SLUG          Extract one article (by WordPress slug) into the cache
   --all                Extract every slug present in the cached API pages
+  --dry-run            Print the request URL(s) and exit without fetching
+  --search-json FILE   With --search: read a saved response instead of fetching
   --delay SECONDS      Delay between fetches (default ${DELAY})
   --offline            Do not fetch; read pages from the cache only
   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
@@ -139,12 +145,25 @@ decode_entities() {
         -e 's/&nbsp;/ /g' -e 's/&amp;/\&/g'
 }
 
+# The index URL for one API page. Defined before the argument dispatch so
+# --dry-run can print it without fetching.
+api_url() {
+    local url
+    url="$BASE/wp-json/wp/v2/kb?per_page=$PAGE_SIZE&page=$1"
+    url="$url&_fields=slug,link,modified,title,kbcategories,content"
+    if [[ -n "$SINCE" ]]; then
+        url="$url&modified_after=$SINCE"
+    fi
+    printf '%s' "$url"
+}
+
 # --- search -----------------------------------------------------------------
 
 # One request, no crawl. The query is URL-encoded through jq so a space or a
-# quote in the search term cannot break the URL.
-search_kb() {
-    local enc per url json count slug modified link title
+# quote in the search term cannot break the URL. --search-json reads a saved
+# response instead, which is how the offline test exercises this path.
+search_url() {
+    local enc per
     enc="$(jq -rn --arg q "$SEARCH" '$q|@uri')"
     per="$LIMIT"
     if [[ "$per" -le 0 ]]; then
@@ -152,11 +171,18 @@ search_kb() {
     elif [[ "$per" -gt 100 ]]; then
         per=100
     fi
+    printf '%s/wp-json/wp/v2/kb?search=%s&per_page=%s&_fields=slug,link,title,modified,kbcategories' \
+        "$BASE" "$enc" "$per"
+}
 
-    url="$BASE/wp-json/wp/v2/kb?search=$enc&per_page=$per"
-    url="$url&_fields=slug,link,title,modified,kbcategories"
+search_kb() {
+    local url json count slug modified link title
+    url="$(search_url)"
 
-    if ! json="$(curl -fsSL --retry 3 --max-time 30 -A "$UA" "$url")"; then
+    if [[ -n "$SEARCH_JSON" ]]; then
+        [[ -f "$SEARCH_JSON" ]] || die "search fixture not found: $SEARCH_JSON"
+        json="$(cat "$SEARCH_JSON")"
+    elif ! json="$(curl -fsSL --retry 3 --max-time 30 -A "$UA" "$url")"; then
         die "search request failed: $url"
     fi
 
@@ -294,6 +320,8 @@ while [[ $# -gt 0 ]]; do
         --limit)       LIMIT="${2:?--limit needs a value}"; shift 2 ;;
         --search)      SEARCH="${2:?--search needs a value}"; shift 2 ;;
         --json)        JSON_OUT=1; shift ;;
+        --search-json) SEARCH_JSON="${2:?--search-json needs a value}"; shift 2 ;;
+        --dry-run)     DRY_RUN=1; shift ;;
         --format)      FORMAT="${2:?--format needs a value}"; shift 2 ;;
         --slug)        SLUG="${2:?--slug needs a value}"; shift 2 ;;
         --all)         EXTRACT_ALL=1; shift ;;
@@ -318,6 +346,11 @@ fi
 [[ "$LIMIT" =~ ^[0-9]+$ ]] || die "--limit must be a number"
 have jq || die "jq is required"
 
+if [[ -n "$SEARCH_JSON" && -z "$SEARCH" ]]; then
+    log "error: --search-json needs --search"
+    exit 2
+fi
+
 if [[ -n "$SEARCH" ]]; then
     if [[ "$SOURCE" != "api" ]]; then
         log "error: --search needs --source api"
@@ -330,6 +363,10 @@ if [[ -n "$SEARCH" ]]; then
     if [[ "$OFFLINE" -eq 1 ]]; then
         log "error: --search cannot be combined with --offline"
         exit 2
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        search_url
+        exit 0
     fi
     search_kb
     exit 0
@@ -366,6 +403,15 @@ if [[ -n "$FORMAT" ]]; then
     exit 2
 fi
 
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    if [[ "$SOURCE" == "api" ]]; then
+        printf '%s\n' "$(api_url 1)"
+    else
+        printf '%s\n' "$SITEMAP"
+    fi
+    exit 0
+fi
+
 mkdir -p "$CACHE"
 FETCHED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -386,16 +432,6 @@ api_page_file() {
 }
 
 api_cat_file() { printf '%s/api-kbcategories-%s.json' "$CACHE" "$1"; }
-
-api_url() {
-    local url
-    url="$BASE/wp-json/wp/v2/kb?per_page=$PAGE_SIZE&page=$1"
-    url="$url&_fields=slug,link,modified,title,kbcategories,content"
-    if [[ -n "$SINCE" ]]; then
-        url="$url&modified_after=$SINCE"
-    fi
-    printf '%s' "$url"
-}
 
 # Load one API page into PAGE_JSON. Returns 1 when the page cannot be read.
 fetch_api_page() {

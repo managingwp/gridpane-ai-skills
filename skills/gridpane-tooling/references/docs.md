@@ -94,7 +94,8 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --search 'fastcgi cache' --limit 
 `--json` emits the raw result array for `jq`. `--limit` is the server-side page
 size, so it caps by WordPress relevance before the newest-first sort. A query
 never touches the cache, so `--search` refuses `--out` and `--offline`; an empty
-result logs `no matches` and exits 0.
+result logs `no matches` and exits 0. `--search-json FILE` reads a saved response
+instead of fetching, which is how the offline test covers this path.
 
 ### Extract text
 
@@ -115,6 +116,8 @@ inline CSS out of the text. Output is
 
 - Descriptive User-Agent, `--retry 3`, a `--delay` (default 1s) between requests,
   `--limit` for partial runs, and a page size capped at 100.
+- `--dry-run` prints the request URL(s) and exits without fetching, so you can
+  see what a run would do before it touches the network.
 - `robots.txt` disallows only `/wp-admin/`. The REST responses carry
   `X-Robots-Tag: noindex`, which is the site's search-indexing preference, not a
   prohibition on reading public content.
@@ -174,11 +177,15 @@ Notes:
 
 ## Tests
 
-`tests/scripts/test_scrape_docs.sh` runs the KB scraper `--offline` against a
-fixture sitemap and cache and asserts the manifest fields, entry count and `/kb/`
-filtering. `tests/scripts/test_scrape_changelog.sh` runs the changelog scraper
-against a fixture page and asserts fields, dedupe, ordering and `--help`. Neither
-touches the network.
+`tests/scripts/test_scrape_docs.sh` is fully offline: it builds a fixture
+sitemap, HTML cache, API page and category map, then asserts the manifest
+envelope and per-entry fields for both sources, the URLs `--dry-run` builds
+(including `modified_after`), one-request search from a saved response
+(ordering, entity decoding, `no matches`, bad flag combinations) and text
+extraction (command text kept, inline CSS and entities dropped).
+`tests/scripts/test_scrape_changelog.sh` runs the changelog scraper against a
+fixture page and asserts fields, dedupe, ordering and `--help`. Neither touches
+the network.
 
 ## Sources
 
