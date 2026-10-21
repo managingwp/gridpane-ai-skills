@@ -893,6 +893,9 @@ api_index() {
         [[ "$n" -eq 0 ]] && break
 
         # Emit each post as one JSONL record, with the body hashed then dropped.
+        # The category map is optional: regenerate an empty one rather than let a
+        # missing temp file abort a finished fetch.
+        [[ -s "$CATMAP" ]] || printf '{}\n' > "$CATMAP"
         jq -c --slurpfile m "$CATMAP" '
             ($m[0]) as $cm
             | .[]

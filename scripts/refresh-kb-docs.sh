@@ -52,8 +52,8 @@ Options:
   -h, --help        Show this help and exit
 
 Everything else is passed to scrape-docs.sh: --base, --cache, --snapshot,
---partial, --allow-fast (fixtures only). The 10 s delay is the scraper's
-default and cannot be lowered for a live run without --allow-fast.
+--partial, --probe-json, --allow-fast (fixtures only). The 10 s delay is the
+scraper's default and cannot be lowered for a live run without --allow-fast.
 EOF
 }
 
@@ -69,11 +69,11 @@ while [[ $# -gt 0 ]]; do
         --manifest)   MANIFEST="${2:?--manifest needs a value}"; shift 2 ;;
         --manifest=*) MANIFEST="${1#--manifest=}"; shift ;;
         -h|--help)    usage; exit 0 ;;
-        --base|--cache|--snapshot|--partial)
+        --base|--cache|--snapshot|--partial|--probe-json)
             PASSTHRU+=("$1"); shift
             [[ $# -gt 0 ]] || die "$1 needs a value"
             PASSTHRU+=("$1"); shift ;;
-        --base=*|--cache=*|--snapshot=*)
+        --base=*|--cache=*|--snapshot=*|--probe-json=*)
             PASSTHRU+=("$1"); shift ;;
         --allow-fast) PASSTHRU+=("$1"); shift ;;
         *) log "error: unknown option: $1"; usage >&2; exit 2 ;;
@@ -103,12 +103,6 @@ latest_snapshot() {
     [[ -n "$name" ]] || return 1
     [[ -f "$CACHE/$name/manifest.json" ]] || return 1
     printf '%s' "$CACHE/$name"
-}
-
-# Content of a manifest without timestamps, to decide whether the committed
-# file needs rewriting at all.
-manifest_fingerprint() {
-    jq -S 'del(.fetched_at) | .entries |= map(del(.fetched_at))' "$1"
 }
 
 probe_line() {
@@ -168,6 +162,7 @@ fi
 
 ARGS=()
 [[ "$FORCE" -eq 1 ]] && ARGS+=(--force)
+[[ "$OFFLINE" -eq 1 ]] && ARGS+=(--offline)
 if [[ ${#PASSTHRU[@]} -gt 0 ]]; then
     ARGS+=("${PASSTHRU[@]}")
 fi
@@ -183,18 +178,27 @@ if [[ -z "$counts" ]]; then
 fi
 
 changed=0
+candidate="$(mktemp)"
 if [[ -f "$MANIFEST" ]]; then
-    if ! diff -q <(manifest_fingerprint "$MANIFEST") \
-            <(manifest_fingerprint "$snapshot/manifest.json") >/dev/null; then
-        changed=1
-    fi
+    # Keep an entry's fetched_at when its content did not change, so the
+    # committed manifest only moves where the KB did.
+    jq -n --slurpfile o "$MANIFEST" --slurpfile n "$snapshot/manifest.json" '
+        ($o[0].entries // [] | map({key: .url, value: .}) | from_entries) as $old
+        | $n[0]
+        | .entries |= map(
+            if ($old[.url] != null and $old[.url].sha256 == .sha256
+                and $old[.url].title == .title)
+            then .fetched_at = $old[.url].fetched_at
+            else . end)' > "$candidate"
 else
-    changed=1
+    cp "$snapshot/manifest.json" "$candidate"
 fi
 
-if [[ "$changed" -eq 1 ]]; then
-    cp "$snapshot/manifest.json" "$MANIFEST.tmp"
-    mv "$MANIFEST.tmp" "$MANIFEST"
+if [[ -f "$MANIFEST" ]] && cmp -s "$candidate" "$MANIFEST"; then
+    rm -f "$candidate"
+else
+    mv "$candidate" "$MANIFEST"
+    changed=1
 fi
 
 rel_snapshot="${snapshot#"$ROOT"/}"

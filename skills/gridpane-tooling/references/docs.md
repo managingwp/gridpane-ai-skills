@@ -178,7 +178,9 @@ scripts/refresh-kb-docs.sh
   summary object. `--base`, `--cache`, `--snapshot`, `--partial` and
   `--allow-fast` pass through to the scraper.
 - It publishes with `cp`+`mv` to the committed manifest only when the content
-  changed (timestamps ignored), so a no-op refresh leaves git clean.
+  changed, and keeps an entry's `fetched_at` when its `sha256` and title are
+  unchanged — the committed file only moves where the KB did. `--offline`
+  republishes from the newest snapshot without fetching.
 - The index's own guards run unchanged: a count drop or an `X-WP-Total`
   mismatch aborts before anything is published.
 
