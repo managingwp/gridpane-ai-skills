@@ -37,6 +37,7 @@ CACHE="$ROOT/out/gridpane-docs-cache"
 
 COMMAND=""
 OFFLINE=0
+REMOTE=0
 FORCE=0
 JSON_OUT=0
 PASSTHRU=()
@@ -48,7 +49,9 @@ Usage: ${SCRIPT_NAME} <command> [options]
 Scrape, inspect and manage the GridPane Knowledge Base cache.
 
 Commands:
-  status              What is ingested, cached and extracted (local only)
+  status [--json] [--remote]
+                      What is ingested, cached and extracted, plus the snapshot
+                      list and drift. Local only unless --remote adds one probe
   check               One request: exit 0 unchanged, 3 changed
   refresh             Probe, index a new snapshot, diff, publish the manifest
   help                Show this help and exit
@@ -78,6 +81,7 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --offline)    OFFLINE=1; shift ;;
+        --remote)     REMOTE=1; shift ;;
         --force)      FORCE=1; shift ;;
         --json)       JSON_OUT=1; shift ;;
         --manifest)   MANIFEST="${2:?--manifest needs a value}"; shift 2 ;;
@@ -107,15 +111,20 @@ if [[ ${#PASSTHRU[@]} -gt 0 ]]; then
 fi
 
 latest_snapshot() {
-    local name=""
+    local name="" dir=""
     if [[ -L "$CACHE/latest" ]]; then
         name="$(readlink "$CACHE/latest")"
     elif [[ -f "$CACHE/latest" ]]; then
         name="$(head -1 "$CACHE/latest")"
     fi
-    [[ -n "$name" ]] || return 1
-    [[ -f "$CACHE/$name/manifest.json" ]] || return 1
-    printf '%s' "$CACHE/$name"
+    if [[ -n "$name" && -f "$CACHE/$name/manifest.json" ]]; then
+        printf '%s' "$CACHE/$name"
+        return 0
+    fi
+    # No usable pointer: fall back to the newest completed snapshot.
+    dir="$(snapshot_names | tail -1)"
+    [[ -n "$dir" ]] || return 1
+    printf '%s' "$CACHE/$dir"
 }
 
 snapshot_names() {
@@ -153,9 +162,59 @@ drift_counts() {
 
 # --- status -----------------------------------------------------------------
 
+# name<TAB>articles<TAB>bytes<TAB>extracted, newest first, completed snapshots
+# only (a directory without manifest.json is an aborted run).
+snapshot_tsv() {
+    local name
+    snapshot_names | sort -r | while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        printf '%s\t%s\t%s\t%s\n' "$name" \
+            "$(jq -r '.count // 0' "$CACHE/$name/manifest.json")" \
+            "$(du -sb "$CACHE/$name" 2>/dev/null | cut -f1)" \
+            "$(find "$CACHE/$name" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+    done
+}
+
+# True when $1 sorts strictly before $2 (ISO-8601 timestamps compare
+# lexicographically). Equal values are not older.
+is_older() {
+    [[ "$1" != "$2" ]] \
+        && [[ "$(printf '%s\n%s\n' "$1" "$2" | LC_ALL=C sort | head -1)" == "$1" ]]
+}
+
+human_size() {
+    awk -v b="${1:-0}" 'BEGIN {
+        if (b >= 1073741824) printf "%.1fG", b / 1073741824
+        else if (b >= 1048576) printf "%.1fM", b / 1048576
+        else if (b >= 1024) printf "%.0fK", b / 1024
+        else printf "%dB", b
+    }'
+}
+
+# One probe request plus the local cursor decides up to date / newer / unknown.
+remote_state() {
+    local line modified slug cursor
+    if ! line="$("$SCRAPER" --probe "${PASSTHRU[@]}" 2>/dev/null)"; then
+        printf 'unreachable\t\t\n'
+        return 0
+    fi
+    modified="${line%%$'\t'*}"
+    slug="${line#*$'\t'}"
+    cursor="$(jq -r '.fetched_at // empty' "$CACHE/last-run.json" 2>/dev/null || true)"
+    if [[ -z "$cursor" ]]; then
+        printf 'unknown\t%s\t%s\n' "$modified" "$slug"
+    elif is_older "${cursor%Z}" "${modified%Z}"; then
+        printf 'newer\t%s\t%s\n' "$modified" "$slug"
+    else
+        printf 'up-to-date\t%s\t%s\n' "$modified" "$slug"
+    fi
+}
+
 cmd_status() {
     local ingested="-" schema="?" fetched="-" snap="" cached="-" files="-"
-    local size="-" extracted="-" drift="" snapshots="" snap_count=0
+    local bytes="0" extracted="-" drift="" tsv="" snap_count=0
+    local newest_mod="-" newest_slug="-"
+    local rstate="" rmod="" rslug=""
 
     if [[ -f "$MANIFEST" ]]; then
         ingested="$(jq -r '.count // "-"' "$MANIFEST" 2>/dev/null || printf '-')"
@@ -167,22 +226,72 @@ cmd_status() {
     if [[ -n "$snap" ]]; then
         cached="$(jq -r '.count // 0' "$snap/manifest.json")"
         files="$(find "$snap" -type f | wc -l | tr -d ' ')"
-        size="$(du -sh "$snap" 2>/dev/null | cut -f1)"
+        bytes="$(du -sb "$snap" 2>/dev/null | cut -f1)"
         extracted="$(find "$snap" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+        newest_mod="$(jq -r '[.entries[] | select(.modified != "")]
+                      | max_by(.modified) | .modified // "-"' "$snap/manifest.json")"
+        newest_slug="$(jq -r '[.entries[] | select(.modified != "")]
+                      | max_by(.modified) | (.url // "-")
+                      | sub(".*/kb/"; "") | sub("/$"; "")' "$snap/manifest.json")"
         if [[ -f "$MANIFEST" ]]; then
             drift="$(drift_counts "$MANIFEST" "$snap/manifest.json")"
         fi
     fi
 
-    snapshots="$(snapshot_names | awk 'BEGIN { ORS="" } { print (NR > 1 ? ", " : "") $0 }')"
-    snap_count="$(snapshot_names | wc -l | tr -d ' ')"
+    tsv="$(snapshot_tsv)"
+    snap_count="$(printf '%s\n' "$tsv" | grep -c '^' || true)"
+
+    if [[ "$REMOTE" -eq 1 ]]; then
+        IFS=$'\t' read -r rstate rmod rslug < <(remote_state)
+    fi
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        jq -n \
+            --arg path "${MANIFEST#"$ROOT"/}" \
+            --arg ingested "$ingested" --arg schema "$schema" --arg fetched "$fetched" \
+            --arg snapname "$([[ -n "$snap" ]] && basename "$snap" || true)" \
+            --arg cached "$cached" --arg files "$files" --arg bytes "$bytes" \
+            --arg extracted "$extracted" --arg drift "$drift" --arg tsv "$tsv" \
+            --arg newest_mod "$newest_mod" --arg newest_slug "$newest_slug" \
+            --arg rstate "$rstate" --arg rmod "$rmod" --arg rslug "$rslug" '
+            def num: (try (. | tonumber) catch null);
+            {
+              ingested: {
+                path: $path,
+                count: ($ingested | num),
+                schema: ($schema | num),
+                fetched_at: (if $fetched == "-" then null else $fetched end)
+              },
+              cached: (if $snapname == "" then null else {
+                snapshot: $snapname,
+                count: ($cached | num),
+                files: ($files | num),
+                size_bytes: ($bytes | num)
+              } end),
+              extracted: { count: ($extracted | num) },
+              drift: (if $drift == "" then null else ($drift | fromjson) end),
+              newest: (if $snapname == "" then null else {
+                slug: $newest_slug, modified: $newest_mod
+              } end),
+              snapshots: ($tsv | split("\n") | map(select(length > 0) | split("\t") | {
+                name: .[0], count: (.[1] | tonumber),
+                size_bytes: (.[2] | tonumber), extracted: (.[3] | tonumber)
+              })),
+              remote: (if $rstate == "" then null else {
+                state: $rstate,
+                modified: (if $rmod == "" then null else $rmod end),
+                slug: (if $rslug == "" then null else $rslug end)
+              } end)
+            }'
+        return 0
+    fi
 
     printf 'KB status\n'
     printf '  %-10s %4s articles  %s\n' "ingested" "$ingested" \
         "${MANIFEST#"$ROOT"/} (schema $schema, fetched $fetched)"
     if [[ -n "$snap" ]]; then
         printf '  %-10s %4s articles  snapshot %s (%s files, %s)\n' \
-            "cached" "$cached" "$(basename "$snap")" "$files" "$size"
+            "cached" "$cached" "$(basename "$snap")" "$files" "$(human_size "$bytes")"
         printf '  %-10s %4s articles  .md in snapshot %s\n' \
             "extracted" "$extracted" "$(basename "$snap")"
     else
@@ -197,20 +306,43 @@ cmd_status() {
         printf '  %-10s -  (need both a manifest and a snapshot)\n' "drift"
     fi
     if [[ -n "$snap" ]]; then
-        printf '  %-10s %s  %s\n' "newest" \
-            "$(jq -r '[.entries[] | select(.modified != "")]
-                      | max_by(.modified) | .modified // "-"' "$snap/manifest.json")" \
-            "$(jq -r '[.entries[] | select(.modified != "")]
-                      | max_by(.modified) | (.url // "-")
-                      | sub(".*/kb/"; "") | sub("/$"; "")' "$snap/manifest.json")"
+        printf '  %-10s %s  %s\n' "newest" "$newest_mod" "$newest_slug"
     fi
-    printf '  %-10s %4s  %s\n' "snapshots" "$snap_count" "${snapshots:--}"
+    if [[ "$REMOTE" -eq 1 ]]; then
+        case "$rstate" in
+            up-to-date) printf '  %-10s %s  %s  (up to date)\n' "remote" "$rmod" "$rslug" ;;
+            newer)      printf '  %-10s %s  %s  (newer than the last run)\n' "remote" "$rmod" "$rslug" ;;
+            unreachable) printf '  %-10s %s\n' "remote" "unreachable" ;;
+            *)          printf '  %-10s %s  %s  (no cursor; run: %s refresh)\n' \
+                            "remote" "$rmod" "$rslug" "$SCRIPT_NAME" ;;
+        esac
+    fi
+
+    printf '  %-10s %4s\n' "snapshots" "$snap_count"
+    local shown=0 name count sbytes sextra
+    while IFS=$'\t' read -r name count sbytes sextra; do
+        [[ -n "$name" ]] || continue
+        if [[ "$shown" -ge 10 ]]; then
+            printf '    (+%s older)\n' "$((snap_count - 10))"
+            break
+        fi
+        printf '    %-14s %4s articles  %6s  %s extracted\n' \
+            "$name" "$count" "$(human_size "$sbytes")" "$sextra"
+        shown=$((shown + 1))
+    done <<<"$tsv"
 
     if [[ ! -f "$MANIFEST" ]]; then
         log "hint: no committed manifest yet; run: ${SCRIPT_NAME} refresh"
     fi
     if [[ -z "$snap" ]]; then
         log "hint: no cached snapshot yet; run: ${SCRIPT_NAME} refresh"
+    fi
+    if [[ -n "$drift" ]] && [[ "$(jq -r '[.added,.removed,.changed,.title_changed] | add' <<<"$drift")" -gt 0 ]]; then
+        log "warn: unpublished changes between the manifest and the newest snapshot; run: ${SCRIPT_NAME} refresh"
+    fi
+    if [[ -n "$snap" && -f "$MANIFEST" ]] \
+        && is_older "$fetched" "$(jq -r '.fetched_at // ""' "$snap/manifest.json")"; then
+        log "warn: the committed manifest is older than snapshot $(basename "$snap")"
     fi
 }
 
