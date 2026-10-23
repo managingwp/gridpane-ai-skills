@@ -116,6 +116,10 @@ Every [WRITE] command above includes its rollback. General rules:
   `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
   site the queued run backs up nothing and still exits 0. See
   `references/backups.md` before relying on either.
+- **Missing backups after recreation need storage-specific discovery.** Read
+  [references/missing-backups.md](references/missing-backups.md) before querying:
+  local and remote snapshot IDs can differ, and the new site can point to a
+  different bucket. Empty listings close only the checked source, not recovery.
 - **A local backup cron can exist while local backups are off.**
   `-set-backup-schedule` writes the cron when *any* backup type is enabled, so
   `Remote-Backups:ON` plus `Local-Backups:OFF` still leaves a daily local cron

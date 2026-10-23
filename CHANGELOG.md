@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `gridpane-gp-cli`: missing-backup discovery after accidental deletion and
+  recreation, based on anonymized maintainer-supplied evidence: distinguish
+  initialization from completion, read historical disabled-state checks with
+  context, select storage-specific snapshot IDs, inspect alternate buckets, and
+  bound empty-list conclusions. Includes safe preference summaries, local
+  cache/keyring safeguards for Duplicacy listing, incident routing and trigger
+  prompts; restore execution remains in the separate backup/restore plan.
 - `gridpane-gp-cli`: documented the backup entry points the KB omits, traced to
   `lib/gpbup.sh` in the script snapshot — `gpbup {site} -run-single-site
   {storage}` (the `/etc/cron.d/backup-*` path: queues `-single-site` in the

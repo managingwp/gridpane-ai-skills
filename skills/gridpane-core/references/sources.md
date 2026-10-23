@@ -122,6 +122,28 @@ All checked **2026-10-19**. Snapshot files: `tmp/gpcli/usr/local/bin/gpols`,
 | Additional Security Measure Whitelisting on OpenLiteSpeed (OLS) | https://gridpane.com/kb/additional-security-measure-whitelisting-on-openlitespeed-ols/ |
 | Country-Specific Redirects with GeoIP on OpenLiteSpeed (OLS) Servers | https://gridpane.com/kb/country-specific-redirects-with-geoip-on-openlitespeed-ols-servers/ |
 
+## Missing-backup discovery evidence (2026-10-23)
+
+Maintainer-supplied output from one GridPane server: creation/deletion and remote
+configuration commands in `gridpane.log`; `backup.log` initialization,
+available-backups payloads and enabled-state checks; local snapshot search;
+sanitized Duplicacy preferences; Duplicacy **2.7.2** help and successful targeted
+and all-ID Wasabi listings. Client identifiers, buckets, UUIDs and credentials
+are intentionally not retained here.
+
+- Verified observations: local and remote snapshot IDs differed; recreation
+  retained the local ID but changed remote destination; two distinct buckets
+  existed in one region; empty targeted/all-ID listings returned 0, while other
+  sites' revisions could be listed in another bucket. Initialization alone did
+  not supply a completed revision; historical checks reported backups disabled.
+- Scope: supports `gridpane-gp-cli/references/missing-backups.md`, not a universal
+  ID/bucket naming rule, proof of global absence, or an explanation of setup
+  failure. Original remote configuration-to-bucket mapping remains unverified.
+- Local cache/keyring effects and pre/post-hook suppression were cross-checked
+  against Duplicacy's `listSnapshots`/`setGlobalOptions` implementation:
+  https://github.com/gilbertchen/duplicacy/blob/v2.7.2/duplicacy/duplicacy_main.go
+  (checked 2026-10-23 against the matching upstream release tag).
+
 ## Non-GridPane references
 
 | Topic | URL |

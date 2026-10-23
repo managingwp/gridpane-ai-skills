@@ -5,6 +5,10 @@ backup finished, and how to take one local backup on demand. Read this when a
 backup "succeeds" without producing a revision, when the panel's backup buttons
 spin, or when local backups are configured but never run.
 
+For missing revisions after site deletion/recreation, read
+[missing-backups.md](missing-backups.md): historical evidence, storage-specific
+snapshot IDs, alternate buckets and the recovery hand-off boundary.
+
 The command table lives in `command-reference.md`; this file is the behaviour
 behind it. Facts are traced to the deployed script snapshot (`lib/gpbup.sh`),
 see `gridpane-core/references/sources.md`.

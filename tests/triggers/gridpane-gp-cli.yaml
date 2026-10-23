@@ -10,6 +10,8 @@ should_trigger:
   - "what does gpbup example.com -run-single-site local do"
   - "did our scheduled local backup actually run for example.com"
   - "the backup button in gridpane has been spinning for example.com for an hour"
+  - "which duplicacy commands find missing GridPane backups after example.com was deleted and recreated"
+  - "GridPane initialized the repository but did a backup revision actually complete"
 
 should_not_trigger:
   - "clear all caches for example.com and check redis is being used"

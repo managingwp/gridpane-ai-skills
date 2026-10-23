@@ -71,6 +71,15 @@ the skill and reference file that mentions it, plus what would confirm it.
   `Local-Backups:OFF`. Confirm whether the app intends this or whether the cron
   should track the per-storage toggle (`gridpane-gp-cli/references/backups.md`).
 
+- **Remote setup requested but backups disabled (2026-10-23 capture).** One
+  deleted/recreated-site investigation found creation-time remote setup requests,
+  repeated pre-deletion `No backups are enabled.` checks, and no matching revisions
+  in three identified buckets. The original configuration-to-bucket mapping and
+  setup failure cause remain unknown; request those from GridPane support rather
+  than inferring deletion purged backups or no backup ever existed
+  (`gridpane-gp-cli/references/missing-backups.md`). Follow-up belongs to the
+  evidence/preflight work in `20261021-backup-restore-skill`.
+
 ### OpenLiteSpeed
 
 - **`gpols` command semantics.** The help lists

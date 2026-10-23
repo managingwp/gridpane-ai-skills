@@ -74,6 +74,7 @@ tail -n 50 /var/log/nginx/example.com.error.log
 | Redirect loop | `curl -I`; Cloudflare SSL mode; wp options | Cloudflare Flexible + origin redirect; site URL mismatch | `security/cloudflare`, `wordpress` | Set Full (strict); fix site URL |
 | DB connection error | MySQL service; error log; processlist | MySQL down; too many connections; disk full | `server-diagnostics/mysql` | Restart MySQL ([WRITE]); raise connections |
 | Backup spinner / backup "succeeds" with no revision | `active.backups.monitoring.log`; `backups.env` toggles; `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` | Scheduled run no-opped (toggle off); no completion callback; hung job holding the single queue slot | `gp-cli/references/backups.md` | Run a manual backup ([WRITE]); post the callback; fix the toggle/cron mismatch |
+| Backups missing after accidental deletion/recreation | Historical `backup.log` with context; storage-specific IDs and original bucket | Initialization without a revision; disabled backups; recreated site uses different storage | `gp-cli/references/missing-backups.md` | Discover existing revisions first; hand off exhausted sources to support/provider recovery |
 
 ## 502 Bad Gateway
 
