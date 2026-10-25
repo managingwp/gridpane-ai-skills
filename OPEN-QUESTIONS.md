@@ -4,6 +4,13 @@ Items the maintainer needs to decide or confirm. Per [AGENTS.md](AGENTS.md),
 anything that cannot be verified against the GridPane Knowledge Base or
 maintainer-supplied server output is recorded here rather than presented as fact.
 
+Open items are tracked by plans: `20261020-resolve-open-questions` (settleable
+from the `gpcli` snapshot and public docs), `20261020-live-verification` (needs
+capture from a real server), `20261021-backup-restore-skill` (the restore gap),
+`20261021-kb-text-snapshots` (the cache policy question) and
+`20261021-scope-boundaries` (what stays out of scope). Items marked decided are
+closed.
+
 ## Unverified facts
 
 Facts used in a skill that could not be traced to a source yet. Each entry names
@@ -46,6 +53,32 @@ the skill and reference file that mentions it, plus what would confirm it.
 - **MariaDB vs MySQL.** The captured stack is Percona and the scripts detect
   MariaDB (`lib/services.sh`), referencing `mysql.service`. Confirm the unit names
   on a MariaDB box (`gridpane-server-diagnostics/references/mysql.md`).
+- **Panel local backups use the scheduled path.** On one server a panel-triggered
+  local backup arrived as a `-single-site local` task (an entry in
+  `active.backups.monitoring.log`, none in `manual-backups.log`) and therefore
+  never posted `/backups/backup`. Confirm the panel behaves the same after a
+  local toggle change and on a second server
+  (`gridpane-gp-cli/references/backups.md`).
+- **`gp -function-run` as a state-clearing path.** Posting
+  `gpbup::callback::manual_backup_status 1 {site} local` re-enabled the panel's
+  backup buttons on the observed server. It is an internal entry point with no
+  KB page; confirm GridPane support treats it as safe, and that
+  `status=failed` is the accepted value for clearing the state on all plans
+  (`gridpane-gp-cli/references/backups.md`).
+- **Cron written for a storage whose toggle is off.** `-set-backup-schedule`
+  gates on `checkbackupsenabled` with no type, so a `local` cron can exist while
+  `Local-Backups:OFF`. Observed once: a `backup-daily-local-*` file alongside
+  `Local-Backups:OFF`. Confirm whether the app intends this or whether the cron
+  should track the per-storage toggle (`gridpane-gp-cli/references/backups.md`).
+
+- **Remote setup requested but backups disabled (2026-10-23 capture).** One
+  deleted/recreated-site investigation found creation-time remote setup requests,
+  repeated pre-deletion `No backups are enabled.` checks, and no matching revisions
+  in three identified buckets. The original configuration-to-bucket mapping and
+  setup failure cause remain unknown; request those from GridPane support rather
+  than inferring deletion purged backups or no backup ever existed
+  (`gridpane-gp-cli/references/missing-backups.md`). Follow-up belongs to the
+  evidence/preflight work in `20261021-backup-restore-skill`.
 
 ### OpenLiteSpeed
 
@@ -68,6 +101,18 @@ Changes to the skill set or safety model that need maintainer sign-off
 - **License (decided).** MIT confirmed; `LICENSE` and `README.md` reflect it.
 - **OpenLiteSpeed scope (decided).** Full OLS parity is in scope and tracked in
   the follow-up PGF `20261019-ols-parity`.
+- **KB text snapshots (open).** Whether extracted KB text should be committed for
+  offline agent use, or stay in the gitignored cache. Current behaviour: only the
+  manifest is committed; raw JSON/HTML and extracted Markdown never are
+  (`gridpane-tooling/references/docs.md`). Decide before any skill ships KB text.
+- **Backup and restore coverage (open).** Backups are documented in
+  `gridpane-gp-cli/references/backups.md`, but the repo has no restore guidance
+  at all while `lib/restore.sh` sits unused in the snapshot. Proposal: a
+  `gridpane-backup-restore` skill covering local and remote restore, the
+  `/backups/restore` callback path, the pre-restore safeguards (quiesce the site,
+  verify the revision, confirm the target), and when to hand off to GridPane
+  support instead. Needs sign-off before a new skill folder appears under
+  `skills/`.
 
 ## Needs real-server output
 

@@ -4,7 +4,7 @@ Agent Skills for operating **GridPane**-managed WordPress servers: diagnosing, t
 
 These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or any tool that supports the open `SKILL.md` format) how a GridPane server is laid out, which commands are safe to run, and how to work through common incidents. The agent gets the same mental model an experienced GridPane operator already has.
 
-> Status: **in development.** See [PLAN.md](PLAN.md) for the build plan and [AGENTS.md](AGENTS.md) for contributor and agent rules.
+> Status: **v0.4.0 released.** See [CHANGELOG.md](CHANGELOG.md) for release history and [AGENTS.md](AGENTS.md) for contributor and agent rules.
 
 ---
 
@@ -15,7 +15,7 @@ These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or 
 | `gridpane-core` | Any GridPane task. Covers stack layout, paths, the `gp` CLI conventions and the safety protocol. Other skills depend on it. | Read |
 | `gridpane-incident-triage` | A site is down, slow, throwing 502/504/500, or a server alert fired | Read → Write |
 | `gridpane-server-diagnostics` | Checking load, PHP workers (PHP-FPM on Nginx, LSAPI on OLS), MySQL/MariaDB, Redis, disk, logs and services | Read |
-| `gridpane-gp-cli` | Running or explaining `gp` commands for sites, stack, PHP, caching and backups | Read / Write |
+| `gridpane-gp-cli` | Running or explaining `gp` commands for sites, stack, PHP, caching and backups, including backup troubleshooting (spinner, no-op schedules) | Read / Write |
 | `gridpane-nginx-config` | Adding or reviewing custom Nginx includes or OpenLiteSpeed `ols/` headers, rewrites and IP allow/deny | Write |
 | `gridpane-wordpress` | WP-CLI as the site user, caching (FastCGI / Redis Page / Object / LSCache), cron, staging and migrations | Read / Write |
 | `gridpane-security` | 7G/6G WAF (6G is Nginx-only), ModSecurity, Fail2ban, Cloudflare real-IP/proxy setup, and compromised-site first response | Read / Write |
@@ -30,24 +30,59 @@ Both GridPane web servers are covered: **Nginx** (PHP-FPM, FastCGI/Redis page ca
 
 ## Install
 
-Skills are plain folders. Copy or symlink the ones you want into your agent's skills directory:
+### With `npx skills` (recommended)
+
+The [skills CLI](https://github.com/vercel-labs/skills) downloads the skills, links them into the agents you use, and tracks them for updates:
 
 ```bash
-git clone https://github.com/<org>/gridpane-ai-skills.git
+# Interactive: pick the skills and the agents (Claude Code, Codex, OpenCode, Cursor, ...)
+npx skills add managingwp/gridpane-ai-skills
+
+# Install every GridPane skill for one agent, globally
+npx skills add managingwp/gridpane-ai-skills --skill '*' -a opencode -g
+
+# Non-interactive, project scope
+npx skills add managingwp/gridpane-ai-skills --skill '*' -a claude-code -y
+
+# List what the repository offers without installing
+npx skills add managingwp/gridpane-ai-skills --list
+```
+
+Use `--copy` instead of the default symlinks when your agent does not follow them.
+
+A single-skill install must include `gridpane-core`, because the other skills rely on its paths, `gp` conventions and safety protocol:
+
+```bash
+npx skills add managingwp/gridpane-ai-skills --skill gridpane-core --skill gridpane-incident-triage -a claude-code
+```
+
+Update or remove installed skills later:
+
+```bash
+npx skills update
+npx skills remove gridpane-security
+npx skills list
+```
+
+### Manual install (offline)
+
+Skills are plain folders, so you can clone and copy them yourself. Use `skills/gridpane-*` rather than `skills/*` so the internal scaffold (`skills/_template`) is not copied:
+
+```bash
+git clone https://github.com/managingwp/gridpane-ai-skills.git
 cd gridpane-ai-skills
 
 # Claude Code (user-wide)
-mkdir -p ~/.claude/skills && cp -r skills/* ~/.claude/skills/
+mkdir -p ~/.claude/skills && cp -r skills/gridpane-* ~/.claude/skills/
 
 # Claude Code (per-project)
-mkdir -p .claude/skills && cp -r /path/to/gridpane-ai-skills/skills/* .claude/skills/
+mkdir -p .claude/skills && cp -r skills/gridpane-* .claude/skills/
 
 # Agents that read .agents/skills (Codex, OpenCode, Copilot, etc.)
-mkdir -p .agents/skills && cp -r /path/to/gridpane-ai-skills/skills/* .agents/skills/
+mkdir -p .agents/skills && cp -r skills/gridpane-* .agents/skills/
 ```
 
-Or use the installer, which copies (or, with `--link`, symlinks) the skills and
-always includes `gridpane-core`:
+The installer does the same, copying (or, with `--link`, symlinking) the skills and always including `gridpane-core`:
 
 ```bash
 scripts/install.sh --target ~/.claude/skills
@@ -59,11 +94,36 @@ Always install `gridpane-core`. The other skills reference it.
 
 ---
 
+## Scripts
+
+Repository tooling, run from a clone:
+
+| Script | What it does |
+|---|---|
+| `scripts/install.sh` | Copy or symlink skills into an agent's skills directory (`--target`, `--link`, `--skills`); always includes `gridpane-core` |
+| `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, secrets, IPs, domains. Run before committing; exits non-zero on a problem |
+| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
+
+Shipped with the skills and used by them:
+
+| Script | Skill | What it does |
+|---|---|---|
+| `gp-healthcheck.sh` | `gridpane-server-diagnostics` | Read-only sweep of load, memory, disk, services and PHP-FPM pools (`--json`, `--site`) |
+| `gp-api.sh` | `gridpane-api` | Thin request wrapper for the GridPane API; token from `GRIDPANE_API_TOKEN` |
+| `gp-inventory.sh` | `gridpane-api` | Server and site inventory export |
+| `scrape-docs.sh` | `gridpane-tooling` | Index, search and extract the GridPane Knowledge Base (WordPress REST feed, sitemap fallback). Maintainer tooling — see `skills/gridpane-tooling/references/docs.md` |
+| `scrape-changelog.sh` | `gridpane-tooling` | Changelog digest from Upvoty's public JSON API |
+
+Every script takes `--help`. `tests/scripts/*.sh` are the offline test suites; they are not part of an install and touch no network (the KB and snapshot cases run against a loopback fixture server).
+
+---
+
 ## Requirements
 
 - SSH access to GridPane servers as **root** (or a sudo user), for server-side skills
 - A GridPane **API token** in `GRIDPANE_API_TOKEN`, for `gridpane-api` only. Never commit it.
-- `bash`, `curl` and `jq` on the machine running API scripts
+- `bash`, `curl` and `jq` on the machine running API and KB scripts
+- `python3` only for the repository test suites
 
 ---
 
@@ -97,12 +157,11 @@ GridPane servers are usually live production hosting for paying clients. Every s
 gridpane-ai-skills/
 ├── README.md
 ├── AGENTS.md               # rules for agents/contributors working on this repo
-├── PLAN.md                 # build plan and acceptance criteria
 ├── OPEN-QUESTIONS.md       # unverified facts and scope proposals
 ├── LICENSE
 ├── CHANGELOG.md
 ├── skills/
-│   ├── _template/          # skeleton for new skills
+│   ├── _template/          # internal skeleton, hidden from npx skills
 │   ├── gridpane-core/
 │   │   ├── SKILL.md
 │   │   └── references/     # paths.md, gp-conventions.md, safety.md, sources.md, stack-overview.md
@@ -119,11 +178,14 @@ gridpane-ai-skills/
 │   │   └── references/     # caching.md
 │   ├── gridpane-security/
 │   │   └── references/     # waf.md, fail2ban.md, cloudflare.md, compromise-first-response.md
+│   ├── gridpane-tooling/
+│   │   ├── references/     # docs.md, docs-manifest.json, gp-command-reference.md, ...
+│   │   └── scripts/        # scrape-docs.sh, scrape-changelog.sh
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh
-├── scripts/                # install.sh, lint-skills.sh
-└── tests/                  # trigger evals, script tests, scenarios
+├── scripts/                # install.sh, lint-skills.sh, gridpane-kb-docs.sh
+└── tests/                  # trigger evals, script tests (test_scrape_docs.sh, ...), scenarios
 ```
 
 ---

@@ -32,8 +32,8 @@ Read the reference that matches the task:
 - `references/gp-command-reference.md` — the `gp` command tree, by area.
 - `references/developing-tools.md` — patterns for adding tooling: placement,
   config I/O, logging, callbacks and monit integration.
-- `references/docs.md` — the KB docs manifest and the (deferred) changelog
-  capture.
+- `references/docs.md` — the KB index (REST feed, plus a sitemap fallback),
+  one-request search, text extraction, and the changelog capture.
 
 ## Prerequisites
 
@@ -121,4 +121,4 @@ backup and rollback and follow the `gridpane-core` safety protocol.
 - Useful Commands for Managing GridPane Servers — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 - GridPane Logs — https://gridpane.com/kb/gridpane-logs-how-to-find-them-and-when-to-use-them/
 
-Last verified: 2026-10-14
+Last verified: 2026-10-21

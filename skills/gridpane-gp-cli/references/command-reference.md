@@ -1,9 +1,10 @@
 # gp command reference
 
 Verified `gp` commands, grouped by area. Every row carries a label. This is
-extracted from the GP-CLI Quick Reference and the dedicated KB articles
-(see `sources.md`). When in doubt, confirm flags with `gp … --help` on the
-server before running.
+extracted from the GP-CLI Quick Reference and the dedicated KB articles, plus
+the deployed script snapshot for the internal entry points the KB does not
+document (see `sources.md`). When in doubt, confirm flags with `gp … --help` on
+the server before running.
 
 For the complete dispatcher view — every top-level command including internal
 ones such as `audit`, `conf` and `function-run`, mapped to the functions they
@@ -146,11 +147,24 @@ Per-site overrides (positional `{site.url}` last):
 | Label | Command | Notes |
 |---|---|---|
 | [WRITE] | `gpbup2 {site.url} -local-single-site` | Trigger one local v2 backup. |
+| [WRITE] | `gpbup {site.url} -local-single-site` / `-remote-single-site {storage}` | Manual backup, tagged `<epoch>-manual`. |
+| [WRITE] | `gpbup {site.url} -run-single-site {storage}` | Cron interface: queue one scheduled-form backup (async). |
+| [WRITE] | `gpbup {site.url} -local-bup-on` / `-local-bup-off` | Toggle automated local backups; `-on` also writes the local schedule cron and syncs the panel. |
 | [WRITE] | `gpbup {site.url} -remote-bup-on` / `-remote-bup-off` | Toggle automated remote backups. |
 | [WRITE] | `gpbup all-sites -remote-bup-on` / `-remote-bup-off` | **All sites.** |
 | [DESTRUCTIVE] | `gpbup {site.url} -purge {storage} "{from}" "{to}"` | Delete backups in a date range. |
 | [WRITE] | `gpbup -update-gridpane-backups-system` | Update the backup system. |
 | [WRITE] | `gpbup {site.url} -set-backup-schedule …` | Set a schedule. |
+
+`{storage}` is `local` or a configured remote (`aws-s3`, `backblaze`, `dropbox`,
+`wasabi`). The site argument must match the `/var/www/{site}` directory name
+exactly; `www.` and `staging.` forms address a different site or fail.
+
+Read `references/backups.md` when a backup succeeds without a revision, when the
+panel's backup buttons spin, when local backups are configured but never run, or
+before taking a one-off local backup. It covers the entry points and their tags,
+the toggles and schedules, the disk threshold, the two lock files, the shared
+task-spooler queue, the completion callback, and the log files.
 
 ## WP debug, cron, compression, auth, CSP
 

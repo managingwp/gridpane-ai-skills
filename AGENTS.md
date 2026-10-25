@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for AI agents (and humans) building and maintaining this repository. Read this file and [PLAN.md](PLAN.md) before making changes.
+Instructions for AI agents (and humans) building and maintaining this repository. Read this file before making changes.
 
 ## Mission
 
@@ -8,7 +8,7 @@ Build a set of high-quality, **accurate** and **safe** Agent Skills for GridPane
 
 ## Ground rules
 
-1. **Follow PLAN.md in order.** Work phase by phase. Tick checkboxes in PLAN.md as you complete items, and commit after each completed item or small group of items.
+1. **Work from the plans.** Feature work is tracked in phased Plan Generation Files under `plans/`, which is an external, gitignored hub directory (commit plan changes with `pgf commit gridpane-ai-skills`, never `git add`). Work phase by phase, tick tasks as you complete them, and commit after each completed item or small group of items. Small fixes go in `plans/todos.md`.
 2. **Never invent GridPane specifics.** Paths, `gp` command syntax, API endpoints, config filenames and service names must come from a source:
    - the official GridPane Knowledge Base (`gridpane.com/kb/`) or API docs, or
    - output captured from a real GridPane server and supplied by the maintainer.
@@ -52,6 +52,15 @@ description: >-                   # ≤ 1024 chars; says WHAT it does and WHEN t
 - Write in the imperative, aimed at the agent ("Check…", "Run…", "Ask the user…").
 - Explain *why* a step matters when it isn't obvious. Agents generalise better from reasons than from bare rules.
 
+### Distribution
+
+`skills/` is the published discovery root: `npx skills add managingwp/gridpane-ai-skills` offers every folder there that contains a `SKILL.md`.
+
+- A new skill is not done until `npx skills add . --list` shows it (`Found N skills`, one more than before).
+- Folders beginning with `_` are scaffolding, not skills: they must keep `metadata.internal: true` so the CLI hides them, and the marker must be removed when the folder is renamed to a real skill. `scripts/lint-skills.sh` enforces both directions.
+- Never rely on a sibling skill being installed. `gridpane-core` is required, but the README and every description must still make sense when it is the only skill present.
+- The CI discovery check pins the `skills` CLI version. Bump it in `.github/workflows/ci.yml` and re-run the README commands when you do.
+
 ### Command labels and the safety protocol
 
 Every shell, `gp`, WP-CLI or API call in a skill must carry one label:
@@ -75,8 +84,32 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 ## Repository tooling
 
 - `scripts/lint-skills.sh` validates frontmatter (name matches folder, description length), checks that every command block carries a label, checks for broken relative links, and greps for secrets and real-looking IPs or domains.
-- `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see PLAN.md, Phase 6).
+- `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see `tests/triggers/`).
 - Run `scripts/lint-skills.sh` and `shellcheck` before each commit.
+
+### Refreshing KB facts
+
+Start with `status`: it reads only local state and tells you how much of the KB
+the skills carry, how much is cached, and whether the two have drifted.
+
+```bash
+# [READ] Local state only: ingested, cached, extracted and drift counts.
+scripts/gridpane-kb-docs.sh status
+```
+
+```bash
+# [READ] One request. Exit 0 = nothing changed, 3 = something did.
+scripts/gridpane-kb-docs.sh check
+```
+
+```bash
+# [READ] Full refresh: probe, index into a new dated snapshot, diff, publish.
+scripts/gridpane-kb-docs.sh refresh
+```
+
+- The wrapper runs `scrape-docs.sh` with its defaults: **10 seconds between live requests**, a count guard against the previous snapshot, and a hard failure when the manifest disagrees with the API's `X-WP-Total`. It copies the new manifest to `skills/gridpane-tooling/references/docs-manifest.json` only when the content actually changed.
+- Snapshots and page text live in the gitignored `out/gridpane-docs-cache/<YYYY-MM-DD>/`; the manifest is the only artifact that reaches git. See `skills/gridpane-tooling/references/docs.md`.
+- Read the diff, then update the reference files that cite the changed pages. Do not re-verify pages the diff did not report. `list --filter TEXT` and `search QUERY` find the article behind a change; `diff` and `prune` compare and trim snapshots.
 
 ## Writing style
 
@@ -99,4 +132,4 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 - [ ] Scripts pass shellcheck and have `--help`
 - [ ] Trigger eval file present, with at least 5 should and 3 should-not prompts
 - [ ] `Last verified` date set
-- [ ] PLAN.md checkbox ticked
+- [ ] PGF task ticked, or a `plans/todos.md` entry for a small fix

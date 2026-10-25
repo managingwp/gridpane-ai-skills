@@ -111,6 +111,25 @@ Every [WRITE] command above includes its rollback. General rules:
 - **`gp wp` vs raw `wp`.** Use `gp wp {site.url} …` so WP-CLI runs as the correct
   site system user. `--ssh` is not supported through `gp wp`; use raw WP-CLI for
   that case (see `gridpane-wordpress`).
+- **A zero exit from a backup command is not proof a backup exists.**
+  `gpbup {site} -run-single-site local` only queues the job (task-spooler socket
+  `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
+  site the queued run backs up nothing and still exits 0. See
+  `references/backups.md` before relying on either.
+- **Missing backups after recreation need storage-specific discovery.** Read
+  [references/missing-backups.md](references/missing-backups.md) before querying:
+  local and remote snapshot IDs can differ, and the new site can point to a
+  different bucket. Empty listings close only the checked source, not recovery.
+- **A local backup cron can exist while local backups are off.**
+  `-set-backup-schedule` writes the cron when *any* backup type is enabled, so
+  `Remote-Backups:ON` plus `Local-Backups:OFF` still leaves a daily local cron
+  that no-ops on every run. Read `/var/www/{site}/logs/backups.env`, not the
+  cron file.
+- **A spinning backup button needs a manual backup, not a scheduled one.** Only
+  `-local-single-site` / `-remote-single-site` post `/backups/backup`, the call
+  that re-enables the panel. Run one in `tmux`; an SSH drop skips the callback.
+  If nothing is running and it still spins, post that callback directly with
+  `gp -function-run 'gpbup::callback::manual_backup_status 1 {site} local'`.
 
 ## Sources
 
@@ -118,7 +137,8 @@ Every [WRITE] command above includes its rollback. General rules:
 - GP WP-CLI and Regular WP-CLI — https://gridpane.com/kb/gp-wp-cli/
 - Useful Commands — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 
-See `references/command-reference.md` for the verified command set and
+See `references/command-reference.md` for the verified command set,
+`references/backups.md` for backup behaviour and troubleshooting, and
 `gridpane-core/references/sources.md` for the rest.
 
-Last verified: 2026-10-09
+Last verified: 2026-10-21

@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.4.0 - 2026-10-25
+
+### Added
+
+- `gridpane-gp-cli`: missing-backup discovery after accidental deletion and
+  recreation, based on anonymized maintainer-supplied evidence: distinguish
+  initialization from completion, read historical disabled-state checks with
+  context, select storage-specific snapshot IDs, inspect alternate buckets, and
+  bound empty-list conclusions. Includes safe preference summaries, local
+  cache/keyring safeguards for Duplicacy listing, incident routing and trigger
+  prompts; restore execution remains in the separate backup/restore plan.
+- `gridpane-gp-cli`: documented the backup entry points the KB omits, traced to
+  `lib/gpbup.sh` in the script snapshot — `gpbup {site} -run-single-site
+  {storage}` (the `/etc/cron.d/backup-*` path: queues `-single-site` in the
+  task-spooler `backups` socket and returns), `-single-site` as its executor, and
+  the `local` arm's conditions: `Local-Backups:ON`, the per-site lock, the
+  `backup-max-disk-usage` threshold, the `gp-automated` revision tag, and no
+  prune. `sources.md` now traces `gpbup`, `gpbup2` and `lib/gpbup.sh`.
+- `gridpane-gp-cli`: added `gpbup {site} -local-bup-on` / `-local-bup-off` (the
+  toggle also writes the local schedule cron and syncs the panel) and the
+  observable signature of a skipped local run: about a second, exit 0, and
+  `active.backups.monitoring.log` stopping at `Local backups are NOT enabled`
+  with no `Done!` line.
+- `gridpane-gp-cli`: added the stuck-backup-spinner runbook — only the manual
+  paths post `/backups/backup`, so a scheduled-form run never re-enables the
+  panel and a manual `-local-single-site` is the fix; the two per-site lock files
+  and what a refusal looks like; the single shared task-spooler slot with its
+  20-minute wait and one-hour stuck thresholds; and the trap that
+  `-set-backup-schedule` writes a cron for a storage whose toggle is off, so a
+  local cron can exist with `Local-Backups:OFF`.
+- `gridpane-gp-cli`: added the callback-only unlock — `gp -function-run
+  'gpbup::callback::manual_backup_status 1 {site} local'` posts
+  `/backups/backup` with `status=failed` and re-enables the panel without taking
+  a backup, plus the raw `gp callback /backups/backup …` form and its server-key
+  warning; recorded what a completed manual local run looks like; and noted that
+  the panel's local button arrives as a scheduled-form run, so it needs the local
+  toggle `ON` while CLI one-offs do not.
+- `scripts/gridpane-kb-docs.sh`: one command to scrape and manage the KB cache.
+  `status` reports how many articles are ingested (the committed manifest),
+  cached (the newest snapshot) and extracted, plus the drift between them, the
+  newest article and the snapshot list — without touching the network, and with
+  `--json` and an optional one-request `--remote` check; `check` answers "did
+  anything change?" in one request (exit 3 when it did); `refresh` probes,
+  indexes a new dated snapshot, diffs it against the previous one, and publishes
+  `references/docs-manifest.json` only when its content changed. `list` browses
+  the cached articles, `search` queries the live KB, `diff` compares snapshots,
+  `extract` converts a body to text or markdown, and `prune` removes old
+  snapshots (dry run unless `--yes`).
+- `gridpane-tooling/scripts/scrape-docs.sh --search`: one-request KB lookup
+  against the WordPress REST feed (`--json` for the raw array); a query refuses
+  `--out`/`--offline` and reports `no matches` without failing.
+- `scrape-docs.sh --slug/--all --format text|markdown`: convert a cached KB body
+  to text in the gitignored cache, with pandoc when available and a built-in
+  awk/sed converter otherwise (no inline CSS, entities decoded once).
+
+### Changed
+
+- `gridpane-gp-cli`: backup behaviour moved out of the command table into
+  `references/backups.md` (entry points and tags, toggles and schedules, disk
+  threshold, both lock files, the shared task-spooler queue, the completion
+  callback, the one-off local recipe, and the log files); `command-reference.md`
+  keeps the labelled table and links to it. `gridpane-incident-triage` routes
+  backup failures and the spinning-button symptom there, `tests/safety-review.md`
+  inventories the backup-state writes, and `OPEN-QUESTIONS.md` records the
+  unverified parts plus a proposal for restore coverage.
+- Install path: the repository is a `npx skills` package. `npx skills add
+  managingwp/gridpane-ai-skills` installs the nine production skills into an
+  agent (Claude Code, Codex, OpenCode, …), with `update`/`remove`/`list` handled
+  by the CLI; the README leads with it and keeps `scripts/install.sh` as the
+  offline fallback.
+- `skills/_template`: the scaffold now carries `metadata.internal: true`, so the
+  CLI no longer offers it as an installable `gridpane-example` skill.
+  `scripts/lint-skills.sh` requires the marker on `_`-prefixed folders and
+  rejects it on real skills; `scripts/install.sh` reports the number it actually
+  installed.
+- `gridpane-tooling/scripts/scrape-docs.sh` + `references/docs-manifest.json`:
+  index the KB from the public WordPress REST feed for the `kb` post type — four
+  requests for 387 posts, `X-WP-Total` cross-checked — instead of 387 page
+  fetches. Adds `--source api|sitemap`, `--since` (`modified_after` incremental
+  refresh), category names from `kbcategories`, and a
+  `{source, fetched_at, count, entries}` manifest envelope with per-entry
+  `modified`/`categories`/`source`.
+- `scrape-docs.sh` dates: the manifest `modified` is now UTC (`modified_gmt`)
+  with a new `published` from `date_gmt` and `schema: 2`, because the REST
+  `modified` field is site-local (UTC-4). Adds `--probe` (one request returns
+
+  the newest `modified_gmt`; the site sends no `Last-Modified`/`ETag`) and
+  `--since-last`; search prints UTC dates too.
+- `scrape-docs.sh` snapshots and guards: every live run writes
+  `out/gridpane-docs-cache/<YYYY-MM-DD>[-N]/` and points `latest` at it, never
+  overwriting an existing snapshot. The request delay defaults to 10 s and is a
+  floor for live runs (`--allow-fast` for fixtures only). Aborts on a >10% entry
+  count drop (`--force`), an `X-WP-Total` mismatch (`--partial`), a non-array or
+  >8 MB response, or a concurrent run (`flock`). `--diff` reports
+  added/removed/changed/title-only between two snapshots.
+- `AGENTS.md` and `gridpane-tooling/references/docs.md`: add the "Refreshing KB
+  facts" workflow, the snapshot/guard reference and the five-surface date model
+  (which value is UTC and which is site-local).
+- `gridpane-tooling/references/docs.md` and
+  `gridpane-core/references/sources.md`: document the REST endpoints, the
+  manifest schema, search and extraction, and the measured request/payload
+  numbers; record the KB text-snapshot policy question in `OPEN-QUESTIONS.md`.
+
+### Removed
+
+- `PLAN.md`: the build plan is complete (58 of 58 items, v0.3.0 tagged), so it is
+  retired rather than left as a stale roadmap. Ongoing work is tracked in the
+  external PGFs under `plans/`; `AGENTS.md` now describes that workflow, and the
+  deliberate scope boundaries it carried are recorded in the
+  `20261021-scope-boundaries` plan.
+
 ## v0.3.0 - 2026-10-20
 
 ### Changed

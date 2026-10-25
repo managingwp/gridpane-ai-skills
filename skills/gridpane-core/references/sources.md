@@ -76,6 +76,7 @@ here.
 | `tmp/gpcli/AGENTS.md` | Snapshot conventions, `sync.sh` mirroring |
 | `tmp/gpcli/usr/local/bin/gp` | Dispatcher, sourcing, dispatch labels, unknown-command exit `187` |
 | `tmp/gpcli/usr/local/bin/gpupdate` | Update model, `/run/gridpane` lock |
+| `tmp/gpcli/usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh` | Backup wrapper and `gpbup::main` arms (`-run-single-site`, `-single-site`, `-local-single-site`, `-purge`), `/etc/cron.d/backup-*` line shape, `Local-Backups:ON` prerequisite, local disk threshold, task-spooler queue socket, `gp-automated` revision tag |
 | `tmp/gpcli/usr/local/bin/lib/*.sh` | Path references (`/opt/gridpane`, `/root/gridcreds`, `/var/log`, `/etc/cron.d`, `/etc/logrotate.d`) |
 | `tmp/gpcli/etc/monit/conf.d/programs` | Monit program checks and `gpmonitor` exec pattern |
 | `tmp/gpcli/docs/monit-slack-notifications.md` | monit → `gpmonitor` → GridPane API → Slack chain |
@@ -85,8 +86,22 @@ here.
 | GP-CLI Quick Reference | https://gridpane.com/kb/gp-cli-quick-reference/ | tooling |
 | Useful Commands for Managing GridPane Servers | https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/ | tooling |
 | GridPane Logs — locations and meaning | https://gridpane.com/kb/gridpane-logs-how-to-find-them-and-when-to-use-them/ | tooling |
-| GridPane sitemap (KB enumeration for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
-| GridPane changelog (Upvoty-backed SPA; capture deferred) | https://roadmap.gridpane.com/changelog | tooling |
+| GridPane KB REST feed (`kb` post type, 387 posts) | https://gridpane.com/wp-json/wp/v2/kb | tooling |
+| GridPane KB categories (107 terms) | https://gridpane.com/wp-json/wp/v2/kbcategories | tooling |
+| GridPane sitemap (KB enumeration fallback for the docs manifest) | https://gridpane.com/sitemap.xml | tooling |
+| GridPane changelog (Upvoty-backed SPA; captured via its public JSON API) | https://roadmap.gridpane.com/changelog | tooling |
+
+The KB REST routes were checked **2026-10-21**: `X-WP-Total: 387`, matching the
+sitemap's 387 `/kb/` URLs, and `robots.txt` disallows only `/wp-admin/`. The
+routes are public today but are not a stability guarantee, which is why the
+sitemap path is kept as `--source sitemap`.
+
+Date model, checked **2026-10-21** on one article: REST `modified`/`date` are
+site-local (UTC-4) while `modified_gmt`/`date_gmt` are UTC; the page's
+`<meta article:modified_time>` and JSON-LD `dateModified` and the sitemap
+`lastmod` all equal `modified_gmt`. The site sends **no `Last-Modified` or
+`ETag`** and answers no `304`s, so change detection uses the REST probe rather
+than a conditional request (`gridpane-tooling/references/docs.md`).
 
 ## OpenLiteSpeed (`gridpane-core/references/ols.md`)
 
@@ -106,6 +121,28 @@ All checked **2026-10-19**. Snapshot files: `tmp/gpcli/usr/local/bin/gpols`,
 | Set Custom Expires by Type on OpenLiteSpeed (OLS) | https://gridpane.com/kb/set-custom-expires-by-type-on-openlitespeed-ols/ |
 | Additional Security Measure Whitelisting on OpenLiteSpeed (OLS) | https://gridpane.com/kb/additional-security-measure-whitelisting-on-openlitespeed-ols/ |
 | Country-Specific Redirects with GeoIP on OpenLiteSpeed (OLS) Servers | https://gridpane.com/kb/country-specific-redirects-with-geoip-on-openlitespeed-ols-servers/ |
+
+## Missing-backup discovery evidence (2026-10-23)
+
+Maintainer-supplied output from one GridPane server: creation/deletion and remote
+configuration commands in `gridpane.log`; `backup.log` initialization,
+available-backups payloads and enabled-state checks; local snapshot search;
+sanitized Duplicacy preferences; Duplicacy **2.7.2** help and successful targeted
+and all-ID Wasabi listings. Client identifiers, buckets, UUIDs and credentials
+are intentionally not retained here.
+
+- Verified observations: local and remote snapshot IDs differed; recreation
+  retained the local ID but changed remote destination; two distinct buckets
+  existed in one region; empty targeted/all-ID listings returned 0, while other
+  sites' revisions could be listed in another bucket. Initialization alone did
+  not supply a completed revision; historical checks reported backups disabled.
+- Scope: supports `gridpane-gp-cli/references/missing-backups.md`, not a universal
+  ID/bucket naming rule, proof of global absence, or an explanation of setup
+  failure. Original remote configuration-to-bucket mapping remains unverified.
+- Local cache/keyring effects and pre/post-hook suppression were cross-checked
+  against Duplicacy's `listSnapshots`/`setGlobalOptions` implementation:
+  https://github.com/gilbertchen/duplicacy/blob/v2.7.2/duplicacy/duplicacy_main.go
+  (checked 2026-10-23 against the matching upstream release tag).
 
 ## Non-GridPane references
 
