@@ -29,11 +29,15 @@ are in `references/endpoints.md`.
 ## Workflow
 
 1. **Read before you act.** Start with a GET to understand the fleet.
-2. **Answer fleet questions from inventory**, not by sweeping servers one by one.
-3. **For a mutating call:** show the exact request, the target (one server/site or
+2. **Prefer bulk list endpoints over per-record fetches.** The API rate-limits
+   aggressively (HTTP 429 after a handful of requests), so one paginated
+   `/domain` call beats hundreds of `/site/{id}` calls. Staging inventory comes
+   from `/domain`, not from parent site records.
+3. **Answer fleet questions from inventory**, not by sweeping servers one by one.
+4. **For a mutating call:** show the exact request, the target (one server/site or
    the whole account), the effect and whether it is reversible; wait for
    confirmation; then pass `--yes`.
-4. **Never run fleet-wide destructive actions** without per-target confirmation.
+5. **Never run fleet-wide destructive actions** without per-target confirmation.
 
 ## Commands
 
@@ -88,11 +92,22 @@ awk -F',' 'NR==1 || $3 ~ /8\.1/' out/inventory.csv
   printed. Do not paste it into a transcript or commit it.
 - **Endpoints are actively developed.** The API docs warn that endpoints evolve;
   re-check the collection when something breaks.
-- **List endpoints are verified; site response fields are not.** The servers and
-  sites paths come from the API collection, and the server summary fields are
-  documented there, but the site CSV mapping is best-effort until a live response
-  is captured (`references/endpoints.md`).
-- **Rate limits.** The wrapper backs off on HTTP 429; do not loop aggressively.
+- **`/domain` is nested; `/site` and `/system-user` are flat.** The list
+  endpoints do not share a shape. Read the domain array with
+  `(.data.domains // .data // [])` (`(.data.domains? // .data // [])` when one
+  expression serves both), and remember `meta` is a sibling of `data`, not
+  inside it (`references/endpoints.md`).
+- **`.type` never reports `staging` or `canary`.** `staging.` and `canary.`
+  domains return `type: "primary"`; detect them from the URL prefix
+  `^(staging|canary)\.`, never from `.type` or the `primary_*` booleans.
+- **Staging sites come from one bulk request.** `GET /site` lists primary sites
+  only; a staging copy is a separate record enumerated from
+  `/domain?per_page=500`. Do not iterate `GET /site/{parent}` — it is one
+  rate-limited request per parent and returns null staging fields.
+- **A 422 on a staging site id is expected.** It means "not addressable by this
+  token", not a bad token. A globally bad token answers `302 → /login` instead.
+- **Rate limits.** The wrapper backs off on HTTP 429; prefer bulk list endpoints
+  over per-record fetches.
 - **Tests never touch the live API.** `tests/scripts/` runs against local
   fixtures.
 
@@ -101,5 +116,7 @@ awk -F',' 'NR==1 || $3 ~ /8\.1/' out/inventory.csv
 - GridPane API Introduction and Postman Documentation — https://gridpane.com/kb/gridpane-api-introduction-and-postman-documentation/
 - GridPane API Postman collection — https://documenter.getpostman.com/view/13664964/TVssjU7Z
 - Account Management (API token) — https://gridpane.com/knowledgebase/account-management/
+- Response shapes, pagination and error behaviour: live probe 2026-10-28,
+  evidence in `skills/gridpane-core/references/sources.md`.
 
-See `references/endpoints.md`. Last verified: 2026-10-07
+See `references/endpoints.md`. Last verified: 2026-10-28

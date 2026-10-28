@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.4.1 - 2026-10-28
+
+### Fixed
+
+- `gridpane-api`: corrected the `/domain` list contract after a live probe on
+  2026-10-28. The domain array is at `data.domains` (`data` also carries
+  `constants`, and `meta` is a top-level sibling of `data`), while `/site` and
+  `/system-user` stay flat, so the documented unwrap is
+  `(.data.domains // .data // [])` and `.data.domains?` when one expression
+  serves both. Added the `.type` trap — observed values are `primary` and
+  `alias` only, staging and canary domains report `primary`, and the URL prefix
+  `^(staging|canary)\.` is the only discriminator; bulk staging discovery from
+  one `/domain?per_page=500` request (149 staging domains, 149 site ids absent
+  from `/site`); the 422 semantics for staging site ids and the null staging
+  fields on hydrated parents; and the observed 429 body and pagination
+  metadata. `gridpane-core` records the probe as evidence and points at the API
+  contract, and `gridpane-wordpress` cross-links bulk staging discovery.
+
 ## v0.4.0 - 2026-10-25
 
 ### Added

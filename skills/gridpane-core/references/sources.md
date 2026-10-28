@@ -144,6 +144,44 @@ are intentionally not retained here.
   https://github.com/gilbertchen/duplicacy/blob/v2.7.2/duplicacy/duplicacy_main.go
   (checked 2026-10-23 against the matching upstream release tag).
 
+## GridPane API payload and staging evidence (2026-10-28)
+
+Maintainer-supplied live probe of the GridPane REST API with a valid token on one
+account, read-only GETs only: **75 primary sites**, **238 domains**, **98 system
+users**. Real domains, ids and the token are intentionally not retained here; the
+ids in the skills are illustrative.
+
+- **`/domain` is nested.** The array is at `data.domains`, `data` also carries
+  `constants`, and `meta`/`links` are top-level siblings of `data`. `GET /site`
+  and `GET /system-user` are flat (`data` is the array). One unwrap covers both:
+  `(.data.domains // .data // [])`.
+- **Domain `.type` did not report staging.** Across all 238 domains the observed
+  values were `primary` and `alias` only; `staging.` and `canary.` domains report
+  `type: "primary"`. The documented enum (`primary, alias, redirect, staging,
+  canary`) is not what this endpoint produced on this account.
+- **Staging domains are separate site records.** The URL prefix filter
+  `^(staging|canary)\.` matched 149 of 238 domains, giving 149 distinct `site_id`,
+  none of which appear in the `/site` list. `primary_is_staging` (74 true),
+  `primary_staging_enabled` (3 true) and `primary_canary_enabled` (21 true) do not
+  enumerate them.
+- **Staging ids are not addressable.** `GET /site/{staging_site_id}` returns HTTP
+  422 "That site does not belong to the bearer of this access token"; `GET
+  /site/{parent_id}` for a parent with `staging_site_built_at` set returns 200
+  with `staging_site_id`, `staging_url` and `staging_site` all null, as does the
+  list endpoint for every record. Site settings are therefore unavailable for
+  staging sites.
+- **`/system-user` is redundant for staging discovery.** Its per-user `.sites[]`
+  entries carry only `{id, url}`; 34 staging URLs appeared there and all 34 are a
+  strict subset of the 149 from `/domain`.
+- **Rate limiting is aggressive.** HTTP 429 arrived after a handful of requests,
+  body "Beep, Beep, you're going too fast...".
+
+Scope: one account on one date, so the `.type` finding is "these values were
+observed", not a claim that the documented enum can never appear, and the counts
+describe this account only. Supports `gridpane-api/references/endpoints.md`; it
+does not establish the maximum accepted `per_page`, the rate-limit headers or the
+reset window.
+
 ## Non-GridPane references
 
 | Topic | URL |

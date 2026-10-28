@@ -133,6 +133,9 @@ gp wp example.com plugin list --skip-plugins
 ### Staging
 
 - Push **Live → Staging** to test; push **Staging → Live** to deploy.
+- To enumerate staging sites fleet-wide, use `gridpane-api`: staging sites are
+  separate records found in one `/domain` bulk request, not in `GET /site` and
+  not by fetching each parent site.
 - **Staging → Live overwrites production files and database.** Treat it as
   [DESTRUCTIVE]: require the user to name the action, confirm twice and verify a
   backup exists first.

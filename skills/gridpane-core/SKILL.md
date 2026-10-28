@@ -44,6 +44,11 @@ Load the references on demand rather than all at once:
 - `references/stack-overview.md` — request flow and server model.
 - `references/sources.md` — every fact's source and the date checked.
 
+When the work is fleet-wide through the REST API, read
+`gridpane-api/references/endpoints.md` as well: response shapes are
+per-endpoint, and the `/domain` list is nested at `data.domains` while `/site`
+is flat. This skill documents no endpoint shapes of its own.
+
 For building or debugging your own tooling on a server (the `/usr/local/bin` +
 `lib/` scripts, the `gp` dispatcher, where custom tools may live), see the
 sibling `gridpane-tooling` skill.

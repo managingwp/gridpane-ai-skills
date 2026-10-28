@@ -122,12 +122,12 @@ they are treated as verified.
 - `gp --help` / `gp site --help` / `gp stack --help` output, to confirm the exact
   subcommands and flags used in `gridpane-gp-cli` and
   `gridpane-tooling/references/gp-command-reference.md`.
-- The **site**, **domain** and **system-user** list response field names. The
-  endpoints themselves and the **server** summary fields are now verified from
-  the API collection (`gridpane-api/references/endpoints.md`); the site CSV
-  mapping in `gp-inventory.sh` stays best-effort until one live response is
-  captured.
-- API pagination scheme and rate-limit headers (the collection documents no
-  pagination parameters).
 - A directory listing of the per-site Nginx include location and confirmation of
   which GridPane-managed files `gp` regenerates.
+
+**Resolved 2026-10-28.** A live API probe settled the list response field names
+and the `/domain` nesting, the pagination metadata, and the 422/429 behaviour —
+see `gridpane-api/references/endpoints.md` and the evidence block in
+`gridpane-core/references/sources.md`. Still open from that probe: the maximum
+accepted `per_page`, the rate-limit headers and reset window, and whether a
+staging site's settings are readable through any other endpoint.
