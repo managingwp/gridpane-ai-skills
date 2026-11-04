@@ -141,12 +141,99 @@ Two locks can refuse a run:
   A live pid, or any `duplicacy` process for the site, refuses the run. A dead
   pid with no duplicacy process is cleaned up by the next run.
 
+## Inspecting the queue
+
 All scheduled runs share one task-spooler slot, so one hung job stalls every
-other site's schedule. Inspect with `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l`
-(look for a `running` row) and read the task's `Output` file directly. The script
-waits 20 minutes for a holder and treats one older than an hour as stuck;
-killing a hung task releases its flock with the process, and the next run cleans
-up the stale PID file.
+other site's schedule. The script waits 20 minutes for a holder and treats one
+older than an hour as stuck; killing a hung task releases its flock with the
+process, and the next run cleans up the stale PID file.
+
+A scheduled run is a task-spooler job on a socket of its own, so the question
+"is a backup running?" is answered by the queue, not by `ps`:
+
+```bash
+# [READ] The backup queue: queued, running and finished jobs.
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -l
+```
+
+`$(id -u)` is the uid of the user that queued the job: root for the scheduled
+runs, so the socket is `/tmp/ts-socket-backups.0`. A plain `tsp -l` reads the
+default socket (`$TMPDIR/socket-ts.<uid>`) and therefore looks empty even while
+a backup is running — the wrong socket, not an idle queue.
+
+A socket with no jobs on it — the wrong socket, or a queue whose finished
+results were cleared with `tsp -C` — prints the header and no rows:
+
+```
+ID   State      Output               E-Level  Times(r/u/s)   Command [run=0/1]
+```
+
+`run=` is slots in use out of slots available: `run=0/1` means nothing is
+running and the queue's one slot is free. A real row adds a state (`running`,
+`queued`, `finished`, `skipped`), the path of its `Output` file and the command.
+
+Two traps:
+
+- **`-L` is a label, not a queue.** A job is enqueued as `tsp -L backups …`
+  purely so the listing is readable — `tsp(1)` says the label "will appear next
+  to its command when listing the queue". Every job on the socket is listed
+  whether or not you pass `-L`, and `tsp -L backups` with no command just lists
+  the default queue. Do not go looking for a queue named `backups`.
+- **`ps` shows `gp backup`, not `gpbup`.** The wrapper resolves to
+  `/usr/local/bin/gp backup {site} -single-site {storage}` and is queued as
+  `tsp -L backups /usr/local/bin/gp backup …`, so `ps aux | grep gpbup` finds
+  nothing while a backup runs. Look for `gp backup` in `ps`, or read the queue
+  above.
+
+Once a row is `running`, get its output path, full output, live tail and pid:
+
+```bash
+# [READ] One job's output file, full output, tail and pid. Substitute {id} from
+# the tsp -l row; -t keeps printing while the job is still running.
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -o {id}
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -c {id}
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -t {id}
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -p {id}
+```
+
+When the socket is not where you expect it, ask the live process instead of
+guessing:
+
+```bash
+# [READ] Socket discovery. {pid} is the pid from `tsp -p {id}`. The first half
+# prints the TS_* variables that process inherited (TS_SOCKET, TS_SLOTS); the
+# second lists every task-spooler socket on the box and the process holding it.
+tr '\0' '\n' < /proc/{pid}/environ | grep -E '^TS_'
+ss -xlp | grep -i ts
+```
+
+Before calling a job stuck, prove it is not working:
+
+```bash
+# [READ] Hung or busy? A real run has a duplicacy (or rclone) child and an
+# output file that keeps growing. Check both, twice, before touching the job.
+pgrep -a -P {pid}
+stat -c '%y %n' "{output}"
+```
+
+No child and an output file whose mtime has not moved for far longer than a
+normal run means hung; a child with recent output means busy, and the fix is to
+wait. Only then abort it:
+
+```bash
+# [DESTRUCTIVE] SIGTERM to the job's process group. Only after the checks
+# above show it is hung. Confirm before running.
+TS_SOCKET=/tmp/ts-socket-backups.$(id -u) tsp -k {id}
+```
+
+Blast radius: this one run is aborted, no revision is produced for it, and a
+half-written database dump (`database-<epoch>`) can be left in the site root —
+remove it before the next run or the disk threshold sees it. The queue's single
+slot stays occupied until the process group actually dies, so nothing else
+starts until then. Precondition: `pgrep -P` showed no `duplicacy`/`rclone`
+child. Rollback: fix the cause and re-run the backup (a manual
+`-local-single-site`/`-remote-single-site` if you need it now), then let the
+next scheduled run clean up the stale PID file.
 
 ## Cron can outlive the toggle
 
@@ -172,6 +259,7 @@ state and the app can recreate it the next time a local schedule is saved.
 | `/var/www/{site}/logs/backups.env` | `Local-Backups` / `Remote-Backups` toggles |
 | `/var/www/{site}/logs/{site}.env` | Backup and prune schedule settings |
 
-Last verified: 2026-10-21 against the `tmp/gpcli` snapshot
-(`usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh`) plus a maintainer-supplied run
-on a GridPane server.
+Last verified: 2026-11-04 against the `tmp/gpcli` snapshot
+(`usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh`), a maintainer-supplied run on
+a GridPane server, and the 2026-11-04 backup queue capture
+(`gridpane-core/references/sources.md`).

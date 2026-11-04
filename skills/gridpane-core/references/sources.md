@@ -182,9 +182,33 @@ describe this account only. Supports `gridpane-api/references/endpoints.md`; it
 does not establish the maximum accepted `per_page`, the rate-limit headers or the
 reset window.
 
+## Backup queue evidence (2026-11-04)
+
+Maintainer-supplied `ps` and `tsp` output from a root shell on one GridPane
+server, read-only: nothing was changed on the box. The site is written
+`example.com` and the remote provider `{storage}`; the hostname and address are
+intentionally not retained here.
+
+- A queued scheduled-form backup was alive as
+  `tsp -L backups /usr/local/bin/gp backup {site} -single-site {storage}` — the
+  wrapper's resolved spelling, under task-spooler.
+- That job was still alive after four days with `0:00` CPU time.
+- Two further resident processes were present: `tsp -L backup` and `tsp -s`.
+- `tsp -L backups` on the **default** socket printed the header and no rows —
+  `ID   State      Output               E-Level  Times(r/u/s)   Command [run=0/1]`
+  — while the job above was alive. The backup queue is on its own socket, so
+  this listing answered a different queue.
+
+Scope: the capture did not include `TS_SOCKET`/`TS_SLOTS` for the live job,
+`tsp -l` on the backup socket, or `tsp -i`, so it does **not** establish that
+job's socket path, that socket's slot count, or what the `tsp -L backup` and
+`tsp -s` processes are. Those are recorded in `OPEN-QUESTIONS.md`; the procedure
+they support is `gridpane-gp-cli/references/backups.md`.
+
 ## Non-GridPane references
 
 | Topic | URL |
 |---|---|
 | GridPane API Postman documentation | https://documenter.getpostman.com/view/13664964/TVssjU7Z |
 | GridPane Knowledge Base home | https://gridpane.com/kb/ |
+| task-spooler `tsp(1)` (`-L` label, `-l` list, `-o`/`-c`/`-t` output, `-p` pid, `-k` SIGTERM to the process group) | https://manpages.ubuntu.com/manpages/noble/man1/tsp.1.html |

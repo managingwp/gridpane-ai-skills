@@ -79,6 +79,13 @@ the skill and reference file that mentions it, plus what would confirm it.
   than inferring deletion purged backups or no backup ever existed
   (`gridpane-gp-cli/references/missing-backups.md`). Follow-up belongs to the
   evidence/preflight work in `20261021-backup-restore-skill`.
+- **Task-spooler roles on the backup queue (2026-11-04 capture).** The capture
+  shows `tsp -L backups /usr/local/bin/gp backup …` alive on the same
+  task-spooler queue as resident `tsp -L backup` and `tsp -s` processes, but not
+  which socket, label or slot count that job used, nor what the two resident
+  processes are. Confirm with `TS_SOCKET=… tsp -l` and `tsp -i {id}` captured in
+  the same window on the same server
+  (`gridpane-gp-cli/references/backups.md`).
 
 ### OpenLiteSpeed
 

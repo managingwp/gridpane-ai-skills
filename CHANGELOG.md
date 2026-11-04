@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.4.2 - 2026-11-04
+
+### Added
+
+- `gridpane-gp-cli`: how to tell a backup is queued or running, from the
+  task-spooler socket `/tmp/ts-socket-backups.$(id -u)`: the header-only listing
+  that means the wrong socket, `-L` as a label rather than a selector, the
+  `gp backup` process title in `ps`, socket discovery from
+  `/proc/{pid}/environ`, and the hung-versus-busy checks before `tsp -k`.
+- `VERSION` file at the repository root, seeded with the release version
+  (`0.4.1` when it was added), so the release gate and `git-squash-release.sh`
+  have a writable version source alongside the tag. The release helper is still
+  the only thing that writes it.
+
 ## v0.4.1 - 2026-10-28
 
 ### Fixed

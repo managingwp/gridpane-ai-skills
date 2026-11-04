@@ -42,7 +42,7 @@ errors=0
 error() { printf 'LINT: %s\n' "$1" >&2; errors=$(( errors + 1 )); }
 
 # Domains that are allowed to appear (vendors, docs, examples).
-DOMAIN_ALLOWLIST='example\.com|example\.org|example\.net|gridpane\.com|cloudflare\.com|google\.com|googleapis\.com|wordpress\.org|nginx\.org|postman\.com|github\.com|redis\.io|fail2ban\.org|askubuntu\.com|loggly\.com|perishablepress\.com|context7\.com|glama\.ai|managingwp\.io|keepachangelog\.com|semver\.org|editorconfig\.org|documenter\.getpostman\.com|documenter\.gw\.postman\.com|my\.gridpane\.com|status\.gridpane\.com|roadmap\.gridpane\.com|core-api\.upvotyfeedback\.com|docs\.litespeedtech\.com'
+DOMAIN_ALLOWLIST='example\.com|example\.org|example\.net|gridpane\.com|cloudflare\.com|google\.com|googleapis\.com|wordpress\.org|nginx\.org|postman\.com|github\.com|redis\.io|fail2ban\.org|askubuntu\.com|loggly\.com|perishablepress\.com|context7\.com|glama\.ai|managingwp\.io|keepachangelog\.com|semver\.org|editorconfig\.org|documenter\.getpostman\.com|documenter\.gw\.postman\.com|my\.gridpane\.com|status\.gridpane\.com|roadmap\.gridpane\.com|core-api\.upvotyfeedback\.com|docs\.litespeedtech\.com|manpages\.ubuntu\.com'
 
 # ---------------------------------------------------------------------------
 # 1-3. Per-skill checks

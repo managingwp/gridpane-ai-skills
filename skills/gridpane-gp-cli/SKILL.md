@@ -116,6 +116,12 @@ Every [WRITE] command above includes its rollback. General rules:
   `/tmp/ts-socket-backups.<uid>`) and returns; with local backups off for that
   site the queued run backs up nothing and still exits 0. See
   `references/backups.md` before relying on either.
+- **A running backup is `gp backup` in `ps`, not `gpbup`.** The queue lives on
+  its own task-spooler socket, so a plain `tsp -l` is always empty while a job
+  runs and `ps aux | grep gpbup` finds nothing: `ps` shows
+  `/usr/local/bin/gp backup …`, and the queue row is labelled
+  `tsp -L backups`. See `references/backups.md` for the socket, the `-L` label
+  and the hung-job checks.
 - **Missing backups after recreation need storage-specific discovery.** Read
   [references/missing-backups.md](references/missing-backups.md) before querying:
   local and remote snapshot IDs can differ, and the new site can point to a

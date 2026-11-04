@@ -84,6 +84,9 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 ## Repository tooling
 
 - `scripts/lint-skills.sh` validates frontmatter (name matches folder, description length), checks that every command block carries a label, checks for broken relative links, and greps for secrets and real-looking IPs or domains.
+- `VERSION` holds the current release version and is written only by the release
+  helper (`git-squash-release.sh`); the last git tag assigns it. Hand-edit it only
+  to repair drift, never to choose a version.
 - `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see `tests/triggers/`).
 - Run `scripts/lint-skills.sh` and `shellcheck` before each commit.
 
