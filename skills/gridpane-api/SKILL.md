@@ -1,13 +1,9 @@
 ---
 name: gridpane-api
 description: >-
-  Use for fleet-wide GridPane questions and actions through the GridPane REST
-  API: listing servers and sites, answering "which sites run PHP 8.1?", exporting
-  an inventory, or calling documented endpoints (for example backup schedules or
-  purges) with a token in GRIDPANE_API_TOKEN. Read-only by default; mutating
-  calls need explicit confirmation and there are no unattended fleet-wide
-  actions. Do not use for single-server SSH work (use gridpane-server-diagnostics
-  or gridpane-gp-cli), and do not commit or print the API token.
+  Use for fleet-wide GridPane actions through the REST API: list servers and
+  sites, export inventory, call endpoints. Read-only by default; mutating calls
+  need confirmation.
 ---
 
 # gridpane-api

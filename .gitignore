@@ -11,6 +11,7 @@
 
 # Generated output
 out/
+dist/
 
 # Editor and OS noise
 .DS_Store

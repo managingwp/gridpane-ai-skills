@@ -1,13 +1,8 @@
 ---
 name: gridpane-security
 description: >-
-  Use for security work on a GridPane server: enabling or tuning the 6G/7G and
-  ModSecurity WAFs, reading blocked requests and whitelisting a false positive,
-  checking Fail2ban jails and unbanning an IP, restoring real visitor IPs behind
-  Cloudflare, and first response to a suspected compromised site. Do not use for
-  generic non-GridPane security questions, for active penetration testing, or for
-  writing or running exploit payloads. For a site that is merely down start with
-  gridpane-incident-triage.
+  Use for GridPane security work: 6G/7G and ModSecurity WAFs, Fail2ban,
+  Cloudflare real IPs, and first response to a suspected compromise.
 ---
 
 # gridpane-security

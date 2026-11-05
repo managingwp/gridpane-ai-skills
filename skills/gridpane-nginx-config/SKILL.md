@@ -1,13 +1,8 @@
 ---
 name: gridpane-nginx-config
 description: >-
-  Use when adding or reviewing custom Nginx (or OpenLiteSpeed) configuration on a
-  GridPane server: blocking xmlrpc.php, rate-limiting wp-login.php, custom
-  headers, redirects, upload/body size, bypassing the cache for a path, or
-  allow/deny by IP. Covers the supported include locations that GridPane will not
-  overwrite, the edit-backup-validate-reload workflow, ready-to-use snippets and
-  their rollbacks. Do not use for Nginx on non-GridPane servers, or for PHP/MySQL
-  tuning (use gridpane-server-diagnostics).
+  Use to add or review custom Nginx or OpenLiteSpeed config on a GridPane server:
+  blocking xmlrpc.php, redirects, headers, rate limits and IP allow/deny.
 ---
 
 # gridpane-nginx-config

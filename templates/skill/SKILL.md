@@ -1,11 +1,9 @@
 ---
 name: gridpane-example
 description: >-
-  TEMPLATE ONLY. Replace this with a real skill. Use when <situation the user is
-  in>, <second situation>. Covers <what it does> for GridPane servers. Do not use
-  for <sibling case handled elsewhere>.
-metadata:
-  internal: true
+  Replace this with a real skill. Use when <situation the user is in>, <second
+  situation>. Covers <what it does> for GridPane servers. Do not use for
+  <sibling case handled elsewhere>.
 ---
 
 # gridpane-example
@@ -13,12 +11,12 @@ metadata:
 One paragraph of purpose. Say what the skill does and the outcome the agent
 should reach. Name the sibling skill when another is a better fit.
 
-> Folder name must equal the `name` in the frontmatter. Rename the folder and
-> the frontmatter together. Keep the description at or under 1024 characters.
+> Copy this folder to `skills/gridpane-<name>/` and rename the folder and the
+> `name` together. Keep the description at or under 200 characters, the claude.ai
+> limit, and give it the trigger phrases a user would type.
 >
-> `metadata.internal: true` keeps this skeleton out of `npx skills` discovery.
-> Delete it when you rename the folder to a real `gridpane-<name>` skill:
-> `scripts/lint-skills.sh` rejects a real skill that carries the marker.
+> This skeleton sits in `templates/`, outside the `skills/` discovery root, so
+> `npx skills` and Claude never offer it as an installable skill.
 
 ## Prerequisites
 

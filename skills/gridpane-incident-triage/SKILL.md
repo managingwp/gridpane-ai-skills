@@ -1,14 +1,9 @@
 ---
 name: gridpane-incident-triage
 description: >-
-  Use when a GridPane-managed site or server is failing and you need a path to
-  the cause: a site is down or timing out, returning 502/503/504/500, showing a
-  white screen, suddenly slow, a server alert fired (high load, high memory, disk
-  full), SSL is failing, a redirect loop appears, or the database won't connect.
-  Routes to gridpane-server-diagnostics for server resources,
-  gridpane-security for WAF/Cloudflare/compromise, and gridpane-wordpress for
-  plugin/cache causes. Do not use for routine tuning with no symptom, or for
-  servers that are not managed by GridPane.
+  Use when a GridPane site is down, slow, white-screening, returning
+  502/503/504/500, or its SSL fails. Routes to the diagnostics, security and
+  WordPress skills.
 ---
 
 # gridpane-incident-triage

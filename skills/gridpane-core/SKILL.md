@@ -1,14 +1,9 @@
 ---
 name: gridpane-core
 description: >-
-  Use for any task involving a GridPane-managed WordPress server or the GridPane
-  control panel. Load this before running gp CLI commands, editing Nginx, PHP,
-  Redis or firewall config, diagnosing a GridPane site, or handing off to another
-  GridPane skill. Covers the server stack layout, verified filesystem paths, how
-  gp commands are structured, which files GridPane regenerates and must not be
-  hand-edited, and the safety protocol every change must follow. The other
-  gridpane-* skills assume this one is loaded. Do not use for servers that are
-  not managed by GridPane, or for generic WordPress or LEMP questions.
+  Use for any GridPane-managed WordPress server or control panel task: load this
+  first. Covers stack layout, verified paths, gp CLI structure, regenerated files
+  and the safety protocol.
 ---
 
 # gridpane-core

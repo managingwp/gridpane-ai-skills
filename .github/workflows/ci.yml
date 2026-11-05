@@ -19,9 +19,9 @@ jobs:
         run: ./scripts/lint-skills.sh
       - name: Skills discovery
         # Guards the published npx skills surface: the CLI must offer every real
-        # skill under skills/ and nothing else (no _template scaffold). Reads the
-        # local checkout only — no install, no credentials. Bump the pinned CLI
-        # version together with the README commands.
+        # skill under skills/ and nothing else (the skeleton lives in templates/).
+        # Reads the local checkout only — no install, no credentials. Bump the
+        # pinned CLI version together with the README commands.
         env:
           SKILLS_CLI_VERSION: '1.7.4'
         run: |

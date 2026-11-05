@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.5.0 - 2026-11-05
+
+### Added
+
+- claude.ai packaging: `.claude-plugin/marketplace.json` and
+  `.claude-plugin/plugin.json` publish one `gridpane` plugin that exposes all
+  nine skills, so users can add the repository as a marketplace in claude.ai or
+  with `/plugin marketplace add managingwp/gridpane-ai-skills` in Claude Code.
+- `scripts/build-zips.sh` builds `dist/<skill-name>.zip` for each skill and
+  `dist/gridpane-skills-all.zip`. Standalone archives bundle the core and sibling
+  references they cite, rewrite only the staged copies, exclude tests/evals and
+  editor noise, and fail on a name/folder mismatch or an oversized archive.
+- `.github/workflows/claude-packaging.yml` runs lint, ShellCheck, every script
+  test, and the archive build on pull requests, and attaches the archives to the
+  GitHub Release on a `v*` tag.
+- `scripts/git-squash-release.sh` and `tests/scripts/test_git_squash_release.sh`,
+  vendored from the canonical release helper. A release now updates `VERSION`,
+  both Claude manifests, and promotes `CHANGELOG.md`'s `## Unreleased` section.
+- `scripts/lint-skills.sh` now enforces the claude.ai rules: name grammar and
+  folder match, a 1-200 character description, no absolute package links or
+  workstation paths, and equal `VERSION`, plugin, and marketplace versions.
+
+### Changed
+
+- `skills/_template` moved to `templates/skill/`, outside the `skills/`
+  discovery root. `scripts/install.sh` enumerates `skills/gridpane-*`, and the
+  obsolete `metadata.internal` lint rule is gone.
+- All nine skill descriptions shortened to 200 characters or fewer for claude.ai
+  upload compatibility. Skill bodies, commands, and behaviour are unchanged.
+- `README.md` documents both claude.ai install routes, the chat sandbox
+  limitation, the new repository layout, and Python 3 as a packaging requirement.
+- `dist/` is gitignored; archives are release artifacts, not tracked files.
+
 ## v0.4.2 - 2026-11-04
 
 ### Added

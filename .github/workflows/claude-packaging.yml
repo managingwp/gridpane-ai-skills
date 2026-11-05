@@ -1,0 +1,91 @@
+name: Claude packaging
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck and jq
+        run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+
+      - name: Check Python
+        run: python3 --version
+
+      - name: Shellcheck every script
+        run: |
+          mapfile -t scripts < <(find skills scripts tests -name '*.sh' -type f)
+          shellcheck "${scripts[@]}"
+
+      - name: Lint skills and manifests
+        run: ./scripts/lint-skills.sh
+
+      - name: Run script tests
+        run: |
+          for suite in $(find tests/scripts -maxdepth 1 -type f -name '*.sh' | sort); do
+            printf '\n== %s ==\n' "$suite"
+            bash "$suite"
+          done
+
+      - name: Build skill archives
+        run: ./scripts/build-zips.sh
+
+      - name: Validate the Claude plugin
+        # claude plugin validate is the authoritative check, but installing the
+        # Claude Code CLI in CI needs a pinned package version. The maintainer
+        # runs it locally before release; CI uses it only where it is already
+        # installed (for example a self-hosted runner).
+        run: |
+          if command -v claude >/dev/null 2>&1; then
+            claude plugin validate .
+          else
+            echo "claude CLI not installed; local validation is the release gate"
+          fi
+
+      - name: Upload archives for review
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridpane-skill-zips
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Attach archives to the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          python3 - "$tag" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          tag = sys.argv[1]
+          version = pathlib.Path("VERSION").read_text().strip()
+          plugin = json.loads(pathlib.Path(".claude-plugin/plugin.json").read_text())
+          marketplace = json.loads(pathlib.Path(".claude-plugin/marketplace.json").read_text())
+          values = {"VERSION": version, "plugin.json": plugin.get("version")}
+          values["marketplace.json"] = marketplace.get("version")
+          for entry in marketplace.get("plugins", []):
+              values[f"marketplace.json[{entry.get('name')}]"] = entry.get("version")
+          bad = {name: value for name, value in values.items() if value != tag}
+          assert not bad, f"tag {tag} disagrees with {bad}"
+          PY
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes "GridPane Agent Skills $GITHUB_REF_NAME"
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber

@@ -1,14 +1,9 @@
 ---
 name: gridpane-tooling
 description: >-
-  Use when building, deploying, debugging or reviewing custom tooling on a
-  GridPane-managed server: bash or PHP scripts, gp wrappers, monit checks, or
-  tools that read GridPane config and logs. Covers the /usr/local/bin + lib/
-  script architecture, the gp dispatcher and its wrappers, where configs and logs
-  live, which paths GridPane overwrites on update, and how to hook into monit and
-  GridPane notifications. Do not use for writing a WordPress plugin or theme
-  (see gridpane-wordpress), for generic bash/PHP questions with no GridPane
-  context, or before loading gridpane-core for the safety model and paths.
+  Use to build, deploy or debug custom tooling on a GridPane server:
+  /usr/local/bin and lib scripts, the gp dispatcher, overwritten paths, monit
+  hooks and logs.
 ---
 
 # gridpane-tooling

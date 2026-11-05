@@ -1,12 +1,8 @@
 ---
 name: gridpane-wordpress
 description: >-
-  Use for WordPress-level work on a GridPane server: running WP-CLI as the correct
-  site system user via the gp wp wrapper, checking and purging caching (Nginx
-  FastCGI page cache, Redis page cache, Redis object cache), diagnosing "cache
-  isn't working", WP-Cron vs GP-Cron, staging push/pull, site migrations, and
-  enabling WP_DEBUG safely. For suspected compromise hand off to gridpane-security;
-  for a site that is down start with gridpane-incident-triage.
+  Use for WordPress work on a GridPane server: WP-CLI as the site user, FastCGI
+  and Redis caching, cron, staging, migrations and safe WP_DEBUG.
 ---
 
 # gridpane-wordpress

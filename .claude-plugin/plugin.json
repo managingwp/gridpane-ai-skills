@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gridpane",
+  "displayName": "GridPane",
+  "version": "0.5.0",
+  "description": "Agent Skills for diagnosing, tuning and securing GridPane-managed WordPress servers.",
+  "author": {
+    "name": "managingwp",
+    "url": "https://github.com/managingwp"
+  },
+  "homepage": "https://github.com/managingwp/gridpane-ai-skills",
+  "repository": "https://github.com/managingwp/gridpane-ai-skills",
+  "license": "MIT",
+  "keywords": [
+    "gridpane",
+    "wordpress",
+    "server",
+    "diagnostics",
+    "nginx",
+    "openlitespeed"
+  ],
+  "skills": [
+    "./skills/gridpane-api",
+    "./skills/gridpane-core",
+    "./skills/gridpane-gp-cli",
+    "./skills/gridpane-incident-triage",
+    "./skills/gridpane-nginx-config",
+    "./skills/gridpane-security",
+    "./skills/gridpane-server-diagnostics",
+    "./skills/gridpane-tooling",
+    "./skills/gridpane-wordpress"
+  ]
+}

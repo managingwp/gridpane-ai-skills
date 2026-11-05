@@ -64,9 +64,42 @@ npx skills remove gridpane-security
 npx skills list
 ```
 
+### claude.ai (chat)
+
+There are two routes. Both install the same nine skills, and neither gives the chat sandbox SSH access to your server.
+
+#### Plugin marketplace
+
+The repository is a Claude plugin marketplace that lists one plugin, `gridpane`, containing every skill.
+
+1. In claude.ai open **Customize → Plugins**.
+2. Click **Add**, then **Add marketplace**.
+3. Choose **Add from a repository** and paste `https://github.com/managingwp/gridpane-ai-skills`.
+4. Choose **Sync**, then install **gridpane**.
+
+Claude Code users can register the same marketplace from the terminal:
+
+```text
+/plugin marketplace add managingwp/gridpane-ai-skills
+/plugin install gridpane --marketplace managingwp/gridpane-ai-skills
+```
+
+#### Per-skill ZIPs
+
+Download the archive you need from the [Releases](https://github.com/managingwp/gridpane-ai-skills/releases) page: `gridpane-core.zip`, a `gridpane-<name>.zip`, or `gridpane-skills-all.zip`. Each standalone archive carries local copies of the core references and of the sibling references it cites, so it works without the other skills. The skill folder is the ZIP's top level, which is what claude.ai requires.
+
+1. In claude.ai open **Customize → Skills**.
+2. Click **+**, then **+ Create skill**.
+3. Choose **Upload a skill** and select the ZIP.
+4. Repeat with `gridpane-core.zip`. Uploading core as well is recommended: it carries the full safety model and path reference.
+
+#### Chat limitations
+
+claude.ai chat has no SSH connection to your server and no GridPane API token unless you attach a server connector. Claude therefore gives you commands to run and works from the output you paste back; it cannot inspect a live server on its own. Use Claude Code or another local agent when you want the agent to run commands directly.
+
 ### Manual install (offline)
 
-Skills are plain folders, so you can clone and copy them yourself. Use `skills/gridpane-*` rather than `skills/*` so the internal scaffold (`skills/_template`) is not copied:
+Skills are plain folders, so you can clone and copy them yourself. Use `skills/gridpane-*` rather than `skills/*` so only the production skills are copied (the skeleton now lives in `templates/skill`):
 
 ```bash
 git clone https://github.com/managingwp/gridpane-ai-skills.git
@@ -101,7 +134,9 @@ Repository tooling, run from a clone:
 | Script | What it does |
 |---|---|
 | `scripts/install.sh` | Copy or symlink skills into an agent's skills directory (`--target`, `--link`, `--skills`); always includes `gridpane-core` |
-| `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, secrets, IPs, domains. Run before committing; exits non-zero on a problem |
+| `scripts/build-zips.sh` | Build `dist/<skill>.zip` for each skill and `dist/gridpane-skills-all.zip`. Standalone archives bundle the core and sibling references they cite; output is deterministic and size-checked |
+| `scripts/git-squash-release.sh` | Vendored release helper. A release assigns the version from the last tag to `VERSION`, both Claude manifests and `CHANGELOG.md`, then squashes commits and tags |
+| `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
 | `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
 
 Shipped with the skills and used by them:
@@ -123,7 +158,7 @@ Every script takes `--help`. `tests/scripts/*.sh` are the offline test suites; t
 - SSH access to GridPane servers as **root** (or a sudo user), for server-side skills
 - A GridPane **API token** in `GRIDPANE_API_TOKEN`, for `gridpane-api` only. Never commit it.
 - `bash`, `curl` and `jq` on the machine running API and KB scripts
-- `python3` only for the repository test suites
+- `python3` for the repository test suites, `scripts/build-zips.sh`, and the Claude version updates in the release helper
 
 ---
 
@@ -161,8 +196,12 @@ gridpane-ai-skills/
 ├── LICENSE
 ├── CHANGELOG.md
 ├── VERSION                 # current release version, written by the release helper
+├── .claude-plugin/
+│   ├── marketplace.json    # claude.ai / Claude Code marketplace entry
+│   └── plugin.json         # exposes every skills/gridpane-* skill
+├── templates/
+│   └── skill/              # copyable skeleton, outside the discovery root
 ├── skills/
-│   ├── _template/          # internal skeleton, hidden from npx skills
 │   ├── gridpane-core/
 │   │   ├── SKILL.md
 │   │   └── references/     # paths.md, gp-conventions.md, safety.md, sources.md, stack-overview.md
@@ -185,7 +224,8 @@ gridpane-ai-skills/
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh
-├── scripts/                # install.sh, lint-skills.sh, gridpane-kb-docs.sh
+├── dist/                   # generated skill ZIPs (gitignored)
+├── scripts/                # install.sh, lint-skills.sh, build-zips.sh, git-squash-release.sh, ...
 └── tests/                  # trigger evals, script tests (test_scrape_docs.sh, ...), scenarios
 ```
 

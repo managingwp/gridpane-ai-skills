@@ -1,14 +1,9 @@
 ---
 name: gridpane-server-diagnostics
 description: >-
-  Use when you need to inspect the health of a GridPane server rather than fix
-  one site: checking load, memory and swap, disk and inodes, service states,
-  PHP-FPM pool saturation (max_children), MySQL/MariaDB processlist and slow log,
-  Redis memory, and web server error logs. Also use for "which pool is hitting
-  max_children", "is the database the bottleneck", "what is eating disk", or
-  "which site is causing the load" on a GridPane box. Read-only. For a specific
-  broken site start with gridpane-incident-triage; to action a fix use
-  gridpane-gp-cli or the relevant write skill.
+  Use to inspect a GridPane server's health: load, memory, disk, services,
+  PHP-FPM max_children, MySQL, Redis and logs. Read-only. For one broken site use
+  gridpane-incident-triage.
 ---
 
 # gridpane-server-diagnostics

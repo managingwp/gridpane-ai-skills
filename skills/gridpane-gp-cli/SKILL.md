@@ -1,13 +1,8 @@
 ---
 name: gridpane-gp-cli
 description: >-
-  Use when you need to find, explain or run a GridPane gp CLI command: switching
-  a site's PHP version, toggling caching, SSL, WAFs, backups, suspending a site,
-  syncing settings, checking services, or wrapping WP-CLI. Covers how gp commands
-  are shaped, which flags mutate state versus only report, and the server-wide
-  blast radius of some commands. Prefer this over hand-editing GridPane-managed
-  config. For the server mental model load gridpane-core; for incident-driven
-  work start with gridpane-incident-triage.
+  Use to find, explain or run GridPane gp commands for sites, PHP, caching, SSL,
+  WAFs, backups, suspending and WP-CLI. Covers which flags mutate state.
 ---
 
 # gridpane-gp-cli

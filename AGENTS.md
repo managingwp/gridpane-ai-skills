@@ -28,12 +28,15 @@ skills/<skill-name>/
 └── scripts/            # optional: executable helpers
 ```
 
+`templates/skill/` holds the copyable skeleton. It lives outside `skills/` so
+neither the `npx skills` CLI nor Claude offers it as an installable skill.
+
 ### SKILL.md requirements
 
 ```markdown
 ---
 name: gridpane-example            # must equal the folder name; lowercase, hyphens
-description: >-                   # ≤ 1024 chars; says WHAT it does and WHEN to use it,
+description: >-                   # 1-200 chars; say WHAT it does and WHEN to use it,
   ...                             # including the trigger phrases a user would type
 ---
 ```
@@ -57,7 +60,7 @@ description: >-                   # ≤ 1024 chars; says WHAT it does and WHEN t
 `skills/` is the published discovery root: `npx skills add managingwp/gridpane-ai-skills` offers every folder there that contains a `SKILL.md`.
 
 - A new skill is not done until `npx skills add . --list` shows it (`Found N skills`, one more than before).
-- Folders beginning with `_` are scaffolding, not skills: they must keep `metadata.internal: true` so the CLI hides them, and the marker must be removed when the folder is renamed to a real skill. `scripts/lint-skills.sh` enforces both directions.
+- Start a new skill by copying `templates/skill/` to `skills/gridpane-<name>/` and renaming the folder and the frontmatter `name` together. The skeleton sits outside `skills/`, so it is never offered as an installable `gridpane-example`.
 - Never rely on a sibling skill being installed. `gridpane-core` is required, but the README and every description must still make sense when it is the only skill present.
 - The CI discovery check pins the `skills` CLI version. Bump it in `.github/workflows/ci.yml` and re-run the README commands when you do.
 
@@ -83,12 +86,12 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 
 ## Repository tooling
 
-- `scripts/lint-skills.sh` validates frontmatter (name matches folder, description length), checks that every command block carries a label, checks for broken relative links, and greps for secrets and real-looking IPs or domains.
-- `VERSION` holds the current release version and is written only by the release
-  helper (`git-squash-release.sh`); the last git tag assigns it. Hand-edit it only
-  to repair drift, never to choose a version.
+- `scripts/lint-skills.sh` validates frontmatter (name grammar and folder match, 1-200 character description), checks that every command block carries a label, checks for broken relative links and absolute package/workstation paths, greps for secrets and real-looking IPs or domains, and verifies that `VERSION`, both Claude manifests and the marketplace plugin entry agree.
+- `.claude-plugin/plugin.json` exposes every `skills/gridpane-*` skill explicitly; `.claude-plugin/marketplace.json` lists the single `gridpane` plugin with source `"./"`. A new skill must be added to `plugin.json` (the lint test compares the list with `skills/gridpane-*`).
+- `scripts/build-zips.sh` writes the claude.ai upload archives to the gitignored `dist/`: one standalone `gridpane-<name>.zip` per skill plus `gridpane-skills-all.zip`. Standalone archives vendor the core and sibling references they cite and rewrite only the staged copies. Never edit `skills/` to make a ZIP work; fix the build.
+- `scripts/git-squash-release.sh` is the vendored release helper. `VERSION` and both Claude manifest versions are written only by it; the last git tag assigns them. A release also promotes `CHANGELOG.md`'s `## Unreleased` section. Hand-edit a version only to repair drift, never to choose one.
 - `tests/triggers/<skill>.yaml` holds sample prompts that **should** and **should not** trigger each skill (see `tests/triggers/`).
-- Run `scripts/lint-skills.sh` and `shellcheck` before each commit.
+- Run `scripts/lint-skills.sh`, `shellcheck`, every `tests/scripts/*.sh`, and `claude plugin validate .` before each commit; run `scripts/build-zips.sh` before a release.
 
 ### Refreshing KB facts
 

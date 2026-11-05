@@ -3,9 +3,11 @@
 # lint-skills.sh - repository checks for the GridPane Agent Skills.
 #
 # Checks:
-#   1. SKILL.md frontmatter: name matches the folder, description <= 1024 chars.
+#   1. SKILL.md frontmatter: name grammar and folder match, description <= 200
+#      characters (the claude.ai limit).
 #   2. Every bash/sh code fence carries a [READ]/[WRITE]/[DESTRUCTIVE] label.
-#   3. Relative markdown links resolve to a file in the repo.
+#   3. Relative markdown links resolve to a file in the repo, and no package
+#      file points at a workstation absolute path or an absolute markdown link.
 #   4. No obvious secrets (private keys, bearer tokens, AWS keys, assignments).
 #   5. No real-looking IPv4 addresses (RFC 5737 / loopback only).
 #   6. No real-looking domains outside an allowlist.
@@ -48,6 +50,33 @@ DOMAIN_ALLOWLIST='example\.com|example\.org|example\.net|gridpane\.com|cloudflar
 # 1-3. Per-skill checks
 # ---------------------------------------------------------------------------
 
+# Read one frontmatter key, unfolding a YAML block scalar into one line.
+# Usage: fm_value <SKILL.md> <key>
+fm_value() {
+    awk -v key="$2" '
+        NR == 1 && $0 == "---" { inf = 1; next }
+        inf && $0 == "---" { exit }
+        !inf { next }
+        index($0, key ":") == 1 {
+            value = substr($0, length(key) + 2)
+            sub(/^[ \t]+/, "", value)
+            sub(/[ \t]+$/, "", value)
+            if (value != "" && value !~ /^[>|][-+]?$/) { print value; exit }
+            literal = (value ~ /^\|/)
+            while ((getline line) > 0) {
+                if (line ~ /^[^ \t]/) break
+                sub(/^[ \t]+/, "", line)
+                sub(/[ \t]+$/, "", line)
+                if (line == "") continue
+                if (out == "") out = line
+                else out = out (literal ? "\n" : " ") line
+            }
+            print out
+            exit
+        }
+    ' "$1"
+}
+
 while IFS= read -r skill_md; do
     skill_dir="$(dirname "$skill_md")"
     folder="$(basename "$skill_dir")"
@@ -59,29 +88,42 @@ while IFS= read -r skill_md; do
         continue
     fi
 
-    # `npx skills` discovery: a skill marked `metadata.internal: true` is hidden
-    # from `npx skills add --list`. Scaffolds under skills/_* must carry it; a
-    # real skill must not, or it silently disappears from the published package.
-    internal_marker="$(printf '%s\n' "$fm" | grep -cE '^[[:space:]]+internal:[[:space:]]*true[[:space:]]*$' || true)"
-    if [[ "$folder" == _* ]]; then
-        if [[ "$internal_marker" -eq 0 ]]; then
-            error "$skill_md: scaffold must set 'metadata.internal: true' so npx skills ignores it"
+    name="$(fm_value "$skill_md" name)"
+    if [[ -z "$name" ]]; then
+        error "$skill_md: missing required frontmatter field 'name'"
+    else
+        if ! printf '%s' "$name" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+            error "$skill_md: name '$name' must use lowercase letters, digits and single hyphens"
         fi
-        continue
-    fi
-    if [[ "$internal_marker" -gt 0 ]]; then
-        error "$skill_md: 'metadata.internal: true' hides a real skill from npx skills; remove it"
-    fi
-
-    name="$(printf '%s\n' "$fm" | awk -F':[[:space:]]*' '/^name:/{print $2; exit}' | tr -d ' "')"
-    if [[ "$name" != "$folder" ]]; then
-        error "$skill_md: frontmatter name '$name' does not match folder '$folder'"
+        if [[ "$name" != "$folder" ]]; then
+            error "$skill_md: frontmatter name '$name' does not match folder '$folder'"
+        fi
     fi
 
-    desc_len="$(printf '%s\n' "$fm" | awk '/^description:/{f=1} f{print}' | wc -c | tr -d ' ')"
-    if [[ "$desc_len" -gt 1024 ]]; then
-        error "$skill_md: description is $desc_len chars (> 1024)"
+    desc="$(fm_value "$skill_md" description)"
+    if [[ -z "$desc" ]]; then
+        error "$skill_md: missing required frontmatter field 'description'"
+    else
+        # claude.ai rejects a description over 200 characters.
+        desc_len="$(printf '%s' "$desc" | awk '{ print length($0) }')"
+        if [[ "$desc_len" -gt 200 ]]; then
+            error "$skill_md: description is $desc_len chars (> 200 claude.ai limit)"
+        fi
     fi
+
+    # Package paths must stay inside the uploaded skill. Documentation of real
+    # GridPane server paths (/etc, /var/www, /root, /usr/local/bin) is expected
+    # and allowed; a link or build path rooted anywhere else is not.
+    while IFS= read -r md; do
+        while IFS= read -r hit; do
+            [[ -z "$hit" ]] && continue
+            error "$md:$hit: absolute package link; use a relative path"
+        done < <(grep -nE '\]\(/[^)]*\)' "$md" 2>/dev/null || true)
+        while IFS= read -r hit; do
+            [[ -z "$hit" ]] && continue
+            error "$md:$hit: workstation absolute path; uploaded packages must be self-contained"
+        done < <(grep -nE '/home/|/Users/|(^|[^[:alnum:]])[A-Za-z]:[\\/]' "$md" 2>/dev/null || true)
+    done < <(find "$skill_dir" -type f -name '*.md' | sort)
 
     # Every bash/sh fence must contain a label.
     bad_lines="$(awk '
@@ -158,6 +200,35 @@ while IFS= read -r dom; do
     fi
 done < <(grep -rIohE --exclude=docs-manifest.json --exclude=changelog-manifest.json '[A-Za-z0-9][A-Za-z0-9.-]*\.(com|net|org|io|co|dev|cloud|ai)\b' "$SKILLS_DIR" 2>/dev/null \
             | grep -vE '\.(com|net|org|io|co|dev|cloud|ai)\.' | sort -u || true)
+
+# ---------------------------------------------------------------------------
+# 7. Claude package versions agree with VERSION
+# ---------------------------------------------------------------------------
+
+if [[ "$SKILLS_DIR" == "$REPO_ROOT/skills" && -d "$REPO_ROOT/.claude-plugin" ]]; then
+    version_report="$(python3 - "$REPO_ROOT" <<'PY'
+import json
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+version_file = (root / "VERSION").read_text().strip()
+plugin = json.loads((root / ".claude-plugin/plugin.json").read_text())
+marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
+values = {
+    "VERSION": version_file,
+    "plugin.json": plugin.get("version"),
+    "marketplace.json": marketplace.get("version"),
+}
+for entry in marketplace.get("plugins", []):
+    values[f"marketplace.json[{entry.get('name')}]"] = entry.get("version")
+bad = {name: value for name, value in values.items() if value != version_file}
+for name, value in bad.items():
+    print(f"{name} is {value!r} but VERSION is {version_file!r}")
+raise SystemExit(1 if bad else 0)
+PY
+)" || error "Claude package versions are out of sync: ${version_report//$'\n'/; } (run scripts/git-squash-release.sh to assign a release version)"
+fi
 
 # ---------------------------------------------------------------------------
 

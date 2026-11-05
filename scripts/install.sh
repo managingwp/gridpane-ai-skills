@@ -68,7 +68,7 @@ if [[ -n "$SKILLS" ]]; then
 else
     while IFS= read -r name; do
         selected+=("$name")
-    done < <(find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+    done < <(find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -name 'gridpane-*' -printf '%f\n' | sort)
 fi
 
 # Always include core, and never install the template.
@@ -101,7 +101,6 @@ install_one() {
 installed=0
 for name in "${selected[@]}"; do
     [[ -z "$name" ]] && continue
-    [[ "$name" == _* ]] && continue   # never install the template
     if [[ "$name" == "gridpane-core" ]]; then
         continue
     fi

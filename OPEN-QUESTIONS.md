@@ -70,6 +70,12 @@ the skill and reference file that mentions it, plus what would confirm it.
   `Local-Backups:OFF`. Observed once: a `backup-daily-local-*` file alongside
   `Local-Backups:OFF`. Confirm whether the app intends this or whether the cron
   should track the per-storage toggle (`gridpane-gp-cli/references/backups.md`).
+- **claude.ai custom-skill ZIP size limit.** The Claude Help Center rejects an
+  upload that "exceeds size limits" but does not publish the byte figure; the
+  documented 200 MB applies to plugin uploads, not skills. `scripts/build-zips.sh`
+  therefore uses a provisional 10 MiB default, overridable with
+  `CLAUDE_SKILL_ZIP_MAX_BYTES` (TODO in the script). Confirm the real limit and
+  replace the default.
 
 - **Remote setup requested but backups disabled (2026-10-23 capture).** One
   deleted/recreated-site investigation found creation-time remote setup requests,
