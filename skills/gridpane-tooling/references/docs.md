@@ -161,8 +161,8 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --since-last --out /tmp/kb-delta.
 
 `scripts/gridpane-kb-docs.sh` is the entry point for the KB: it wraps
 `scrape-docs.sh` (the fetch, diff and extract engine) and manages the snapshots.
-Nine subcommands; only `check`, `refresh` and `status --remote` touch the
-network.
+Ten subcommands; only `check`, `refresh`, `status --remote` and `audit --probe`
+touch the network.
 
 ```bash
 # [READ] Local state only: what is ingested, cached, extracted and drifted.
@@ -195,6 +195,14 @@ scripts/gridpane-kb-docs.sh prune --keep 5
 scripts/gridpane-kb-docs.sh prune --keep 5 --yes
 ```
 
+```bash
+# [READ] Are the citations sound? Offline: unknown, uncited-new, stale, coverage.
+scripts/gridpane-kb-docs.sh audit
+
+# [READ] Add the network half: one request per unknown URL, ten seconds apart.
+scripts/gridpane-kb-docs.sh audit --probe
+```
+
 | Command | Network | What it does |
 |---|---|---|
 | `status` | no (`--remote`: one request) | Ingested, cached, extracted, drift, newest article, snapshot list |
@@ -204,8 +212,50 @@ scripts/gridpane-kb-docs.sh prune --keep 5 --yes
 | `search QUERY` | one request | Live KB lookup (`--limit`, `--json`) |
 | `diff [PREV]` | no | Added/removed/changed/title-only between two snapshots |
 | `affected [PREV]` | no | The `file:line` in `skills/` that cites each changed article (`--all`, `--skills DIR`, `--json`) |
+| `audit` | no (`--probe`: one per unknown URL) | Citation soundness: unknown, uncited-new, stale, coverage (`--probe`, `--probe-file`, `--ignore`, `--json`) |
 | `extract` | no | `--slug SLUG` or `--all`, `--format text\|markdown` |
 | `prune` | no | Remove old snapshots (`--keep N`, `--yes`); never the newest |
+
+### Citation audit
+
+`audit` answers a different question from `affected`: not "which files does this
+change touch" but "are the citations themselves sound". It reads the committed
+manifest, the newest two snapshots and `skills/**/*.md`, and writes nothing.
+
+| Check | Needs | Finding |
+|---|---|---|
+| `unknown` | no | A cited slug the manifest does not list |
+| `uncited-new` | two snapshots | An article added between the newest two that no skill cites |
+| `stale` | no | A cited article whose `modified` date is later than the citing file's last commit |
+| `coverage` | no | Distinct articles cited, per skill directory |
+| `moved` | `--probe` | An unknown URL that answers 301/302/307/308, with its target |
+| `down` | `--probe` | An unknown URL that answers 404/410 (or another non-2xx/3xx) |
+
+Three rules keep it cheap and stable:
+
+- **Only unknown URLs are probed.** A URL in the manifest is sound by
+  construction, so a request would tell you nothing. `--probe` therefore costs
+  one request per `unknown` finding, ten seconds apart — four today, zero once
+  the citations are fixed. `--probe-file FILE` reads a saved
+  `{url: {status, location}}` map instead and is how the offline test covers the
+  path.
+- **Fenced code blocks are skipped.** A URL inside an example is an illustration,
+  not a citation.
+- **Staleness uses git, not `Last verified`.** The check compares the article's
+  `modified` date with `git log -1 --format=%cs` for the citing file, falling
+  back to the file's `Last verified:` line when git cannot answer. Not every
+  skill file carries a date, so the commit is the only complete signal.
+
+`--ignore URL` accepts a deliberate exception: the URL stays counted as a
+citation but is left out of every finding. `unknown`, `moved` and `down` are
+unsound citations and exit `3`; `uncited-new` and `stale` are advisory — a new
+article is not a defect, and a stale hit is a prompt to re-read, not proof the
+fact is wrong — so they are reported without changing the exit code.
+
+`--json` emits `{manifest, snapshots, counts, unknown, uncited_new, stale,
+coverage, moved, down}`. `counts` carries `articles`, `cited`, `references`,
+`files` and the six finding counts; each finding carries the `file` and `line`
+that cite it where a location exists.
 
 The three counts `status` reports, so the numbers are unambiguous:
 
@@ -218,15 +268,17 @@ The three counts `status` reports, so the numbers are unambiguous:
 
 Notes:
 
-- Exit codes: `0` done or nothing to do, `3` `check` found changes, `2` usage
-  error, `1` failure. A bare invocation prints usage and exits 2.
+- Exit codes: `0` done or nothing to do, `3` `check` found changes or `audit`
+  found an unsound citation, `2` usage error, `1` failure. A bare invocation
+  prints usage and exits 2.
 - `refresh` accepts `--offline` (rebuild from the newest snapshot without
   fetching), `--force` (accept a count drop) and `--manifest FILE` (publish
   elsewhere); `--json` is available on `status`, `check`, `refresh`, `list`,
-  `search`, `diff` and `prune`. `--base`, `--cache`, `--snapshot`, `--partial`
-  and `--allow-fast` pass through to the scraper. `--snapshot` takes a snapshot
-  name resolved against the cache (or an absolute path); `extract` uses it to read
-  an older snapshot, which is how you compare an article's text across a refresh.
+  `search`, `diff`, `affected`, `audit` and `prune`. `--base`, `--cache`,
+  `--snapshot`, `--partial` and `--allow-fast` pass through to the scraper.
+  `--snapshot` takes a snapshot name resolved against the cache (or an absolute
+  path); `extract` uses it to read an older snapshot, which is how you compare an
+  article's text across a refresh.
 - Publishing keeps an entry's `fetched_at` when its `sha256` and title are
   unchanged, so the committed manifest only moves where the KB did.
 - The index's own guards run unchanged: a count drop or an `X-WP-Total`

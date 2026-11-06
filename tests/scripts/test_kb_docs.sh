@@ -177,9 +177,149 @@ grep -q 'Hello' "$CACHE/2026-01-01/a.md" \
     || fail "extract --snapshot wrote no article text"
 ok "extract reads a named snapshot without --offline"
 
+# --- audit ------------------------------------------------------------------
+
+audit_entry() {
+    printf '{"url":"https://gridpane.com/kb/%s/","sha256":"%s","title":"%s","modified":"%s"}' \
+        "$1" "$2" "$3" "$4"
+}
+
+AUDIT="$WORK/audit"
+mkdir -p "$AUDIT/cache/2026-01-01" "$AUDIT/cache/2026-01-02" \
+    "$AUDIT/skills/alpha" "$AUDIT/skills/beta"
+
+{
+    printf '{"schema":2,"source":"fixture","count":2,"entries":['
+    printf '%s,' "$(audit_entry a 111 A 2026-01-01T00:00:00)"
+    printf '%s]}\n' "$(audit_entry b 222 B 2026-01-01T00:00:00)"
+} > "$AUDIT/cache/2026-01-01/manifest.json"
+cp "$AUDIT/cache/2026-01-01/manifest.json" "$AUDIT/cache/2026-01-02/manifest.json"
+cp "$AUDIT/cache/2026-01-02/manifest.json" "$AUDIT/manifest.json"
+
+# a and b are cited; not-an-article sits in a fenced example and must not count.
+cat > "$AUDIT/skills/alpha/SKILL.md" <<'MD'
+https://gridpane.com/kb/a/
+https://gridpane.com/kb/b/
+
+```
+https://gridpane.com/kb/not-an-article/
+```
+MD
+printf 'https://gridpane.com/kb/b/\n' > "$AUDIT/skills/beta/SKILL.md"
+
+audit_run() {
+    local dir="$1"
+    shift
+    if AUDIT_OUT="$("$CLI" audit --manifest "$dir/manifest.json" \
+            --cache "$dir/cache" --skills "$dir/skills" "$@" 2>"$WORK/audit-stderr")"; then
+        AUDIT_STATUS=0
+    else
+        AUDIT_STATUS=$?
+    fi
+}
+
+audit_run "$AUDIT"
+[[ "$AUDIT_STATUS" -eq 0 ]] || fail "a clean audit exited $AUDIT_STATUS"
+grep -q '^  unknown *0$' <<<"$AUDIT_OUT" || fail "a clean audit is not clean"
+grep -q 'not-an-article' <<<"$AUDIT_OUT" \
+    && fail "a fenced example was treated as a citation"
+ok "a clean fixture exits 0 and skips fenced examples"
+
+audit_run "$AUDIT" --json
+jq -e '.counts.unknown == 0 and .counts.uncited_new == 0 and .counts.stale == 0' \
+    <<<"$AUDIT_OUT" >/dev/null || fail "clean audit counts are wrong"
+jq -e '.counts.cited == 2 and .counts.references == 3' <<<"$AUDIT_OUT" >/dev/null \
+    || fail "clean audit citation counts are wrong: $(jq -c .counts <<<"$AUDIT_OUT")"
+jq -e '.coverage | map(.skill) | sort == ["alpha", "beta"]' <<<"$AUDIT_OUT" \
+    >/dev/null || fail "coverage is not grouped per skill"
+ok "audit --json reports counts, coverage and the empty finding sets"
+
+FIND="$WORK/audit-findings"
+mkdir -p "$FIND/cache/2026-01-01" "$FIND/cache/2026-01-02" "$FIND/skills/alpha"
+{
+    printf '{"schema":2,"source":"fixture","count":2,"entries":['
+    printf '%s,' "$(audit_entry a 111 A 2026-01-01T00:00:00)"
+    printf '%s]}\n' "$(audit_entry b 222 B 2026-01-01T00:00:00)"
+} > "$FIND/cache/2026-01-01/manifest.json"
+{
+    printf '{"schema":2,"source":"fixture","count":3,"entries":['
+    printf '%s,' "$(audit_entry a 111 A 2026-01-01T00:00:00)"
+    printf '%s,' "$(audit_entry b 222 B 2026-01-01T00:00:00)"
+    printf '%s]}\n' "$(audit_entry d 444 D 2026-01-15T00:00:00)"
+} > "$FIND/cache/2026-01-02/manifest.json"
+{
+    printf '{"schema":2,"source":"fixture","count":2,"entries":['
+    printf '%s,' "$(audit_entry a 111 A 2026-02-01T00:00:00)"
+    printf '%s]}\n' "$(audit_entry b 222 B 2026-01-01T00:00:00)"
+} > "$FIND/manifest.json"
+
+cat > "$FIND/skills/alpha/SKILL.md" <<'MD'
+https://gridpane.com/kb/a/
+https://gridpane.com/kb/zzz/
+https://gridpane.com/kb/gone/
+MD
+git -C "$FIND/skills" init -q
+git -C "$FIND/skills" add alpha/SKILL.md
+GIT_AUTHOR_DATE=2026-01-01T00:00:00 GIT_COMMITTER_DATE=2026-01-01T00:00:00 \
+    git -C "$FIND/skills" -c user.name=test -c user.email=test@example.com \
+    commit -q -m fixture
+
+audit_run "$FIND"
+[[ "$AUDIT_STATUS" -eq 3 ]] || fail "an unsound citation exited $AUDIT_STATUS, not 3"
+grep -q 'https://gridpane.com/kb/zzz$' <<<"$AUDIT_OUT" \
+    || fail "a cited-but-unknown slug was not reported"
+grep -q '^  uncited-new *1$' <<<"$AUDIT_OUT" \
+    || fail "an added-and-uncited article was not reported"
+grep -q '^  stale *1$' <<<"$AUDIT_OUT" \
+    || fail "a file committed before the article's modified date is not stale"
+grep -q 'modified 2026-02-01 > 2026-01-01' <<<"$AUDIT_OUT" \
+    || fail "the stale row does not explain the comparison"
+ok "unknown exits 3, and uncited-new and stale are reported"
+
+audit_run "$FIND" --json
+jq -e '.counts.unknown == 2 and .counts.uncited_new == 1 and .counts.stale == 1' \
+    <<<"$AUDIT_OUT" >/dev/null \
+    || fail "findings counts are wrong: $(jq -c .counts <<<"$AUDIT_OUT")"
+jq -e '.uncited_new[0].url == "https://gridpane.com/kb/d"' <<<"$AUDIT_OUT" \
+    >/dev/null || fail "the uncited article is not d"
+jq -e '.stale[0] | .url == "https://gridpane.com/kb/a" and .committed == "2026-01-01"' \
+    <<<"$AUDIT_OUT" >/dev/null || fail "the stale entry is wrong"
+jq -e '.unknown | map(.url) | sort
+       == ["https://gridpane.com/kb/gone", "https://gridpane.com/kb/zzz"]' \
+    <<<"$AUDIT_OUT" >/dev/null || fail "unknown is not the two uncited slugs"
+ok "audit --json carries unknown, uncited_new and stale"
+
+cat > "$WORK/probe.json" <<'JSON'
+{"https://gridpane.com/kb/zzz": {"status": 301,
+  "location": "https://gridpane.com/kb/zzz-new/"},
+ "https://gridpane.com/kb/gone": {"status": 404}}
+JSON
+audit_run "$FIND" --probe --probe-file "$WORK/probe.json" --json
+[[ "$AUDIT_STATUS" -eq 3 ]] || fail "--probe with a moved/down fixture exited $AUDIT_STATUS"
+jq -e '.counts.moved == 1 and .counts.down == 1' <<<"$AUDIT_OUT" >/dev/null \
+    || fail "probe counts are wrong: $(jq -c .counts <<<"$AUDIT_OUT")"
+jq -e '.moved[0].location == "https://gridpane.com/kb/zzz-new"' <<<"$AUDIT_OUT" \
+    >/dev/null || fail "the redirect target was not normalised"
+jq -e '.down[0].status == 404' <<<"$AUDIT_OUT" >/dev/null \
+    || fail "the 404 was not reported as down"
+jq -e '.moved[0].references | length == 1' <<<"$AUDIT_OUT" >/dev/null \
+    || fail "a probe finding lost its citation reference"
+ok "--probe reports moved and down from a saved response, without network"
+
+audit_run "$FIND" --probe --probe-file "$WORK/probe.json" \
+    --ignore https://gridpane.com/kb/zzz/ --ignore https://gridpane.com/kb/gone/
+[[ "$AUDIT_STATUS" -eq 0 ]] || fail "--ignore did not clear the findings ($AUDIT_STATUS)"
+grep -q '^  unknown *0$' <<<"$AUDIT_OUT" || fail "--ignore left an unknown URL"
+ok "--ignore suppresses a deliberate exception"
+
+[[ -z "$(git -C "$FIND/skills" status --porcelain)" ]] \
+    || fail "audit modified the fixture tree"
+ok "audit writes nothing"
+
 # --- help -------------------------------------------------------------------
 
 "$CLI" --help | grep -q 'affected' || fail "--help does not list affected"
-ok "affected appears in --help"
+"$CLI" --help | grep -q 'audit' || fail "--help does not list audit"
+ok "affected and audit appear in --help"
 
 printf 'all cases passed\n'

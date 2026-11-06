@@ -11,6 +11,9 @@
 #   refresh   Probe, index the REST feed into a new dated snapshot (10 s between
 #             requests, count/total/shape guards), diff it against the previous
 #             snapshot, and publish the manifest when its content changed.
+#   audit     Are the citations sound? Four offline checks over the committed
+#             manifest and skills/**/*.md (unknown, uncited-new, stale,
+#             coverage), plus an opt-in --probe for the unknown URLs only.
 #
 # Wraps skills/gridpane-tooling/scripts/scrape-docs.sh: no URL, snapshot or
 # category logic is duplicated here. Raw pages, extracted text and snapshots stay
@@ -24,7 +27,8 @@
 #   extracted   .md files in that snapshot
 #   drift       differences between the committed manifest and that snapshot
 #
-# Exit status: 0 success, 3 check found changes, 2 usage error, 1 failure.
+# Exit status: 0 success, 3 check found changes or audit found an unsound
+# citation, 2 usage error, 1 failure.
 
 set -euo pipefail
 
@@ -35,6 +39,16 @@ SCRAPER="$ROOT/skills/gridpane-tooling/scripts/scrape-docs.sh"
 MANIFEST="$ROOT/skills/gridpane-tooling/references/docs-manifest.json"
 CACHE="$ROOT/out/gridpane-docs-cache"
 SKILLS_DIR="$ROOT/skills"
+UA="gridpane-ai-skills/audit (+https://github.com/managingwp/gridpane-ai-skills)"
+
+AUDIT_TMP=""
+cleanup_audit_tmp() {
+    if [[ -n "$AUDIT_TMP" ]]; then
+        rm -rf "$AUDIT_TMP"
+    fi
+    return 0
+}
+trap cleanup_audit_tmp EXIT
 
 COMMAND=""
 OFFLINE=0
@@ -48,6 +62,10 @@ ALL=0
 FORMAT=""
 KEEP=""
 YES=0
+PROBE=0
+PROBE_FILE=""
+ALLOW_FAST=0
+IGNORE=()
 PASSTHRU=()
 POSITIONAL=()
 
@@ -67,6 +85,8 @@ Commands:
   search QUERY        One-request lookup against the live KB
   diff [PREV]         What changed between two snapshots
   affected [PREV]     Which skill files cite an article that changed between snapshots
+  audit               Are the citations sound? unknown, uncited-new, stale and
+                      coverage, offline; --probe adds moved/down for unknown URLs
   extract             Cached article body as text or markdown
   prune               Remove old snapshots (dry run unless --yes)
   help                Show this help and exit
@@ -75,17 +95,23 @@ Options:
   --offline           refresh: skip the probe and rebuild from the newest snapshot
   --force             refresh: pass --force to the indexer (accept a count drop)
   --json              Print JSON instead of plain lines (status, check, refresh,
-                      list, search, diff, affected, prune)
+                      list, search, diff, affected, audit, prune)
   --filter TEXT       list: keep rows whose slug or title contains TEXT
   --limit N           list/search: at most N rows (list default 20)
   --slug SLUG         extract: the article to convert
   --all               extract: convert every article in the snapshot;
                       affected: also list changed articles no skill cites
-  --skills DIR        affected: scan this tree for citations (default skills/)
+  --skills DIR        affected/audit: scan this tree for citations (default skills/)
   --format text|markdown  extract: output format (default markdown)
   --keep N            prune: snapshots to keep, newest first (default 5)
   --yes               prune: actually delete; without it nothing is removed
-  --manifest FILE     refresh: publish to this path instead of the committed one
+  --manifest FILE     refresh/audit: use this manifest instead of the committed one
+  --probe             audit: request the unknown URLs only, 10 s apart, and
+                      report redirects (moved) and 404/410 (down)
+  --probe-file FILE   audit: read saved {url: {status, location}} responses
+                      instead of fetching (fixtures only)
+  --ignore URL        audit: accept this URL; repeatable. It stays counted as a
+                      citation but is left out of every finding
   -h, --help          Show this help and exit
 
 Passed through to scrape-docs.sh: --base URL, --cache DIR, --snapshot DIR,
@@ -125,6 +151,11 @@ while [[ $# -gt 0 ]]; do
         --manifest=*) MANIFEST="${1#--manifest=}"; shift ;;
         --skills)     SKILLS_DIR="${2:?--skills needs a value}"; shift 2 ;;
         --skills=*)   SKILLS_DIR="${1#--skills=}"; shift ;;
+        --probe)      PROBE=1; shift ;;
+        --probe-file) PROBE_FILE="${2:?--probe-file needs a value}"; shift 2 ;;
+        --probe-file=*) PROBE_FILE="${1#--probe-file=}"; shift ;;
+        --ignore)     IGNORE+=("${2:?--ignore needs a value}"); shift 2 ;;
+        --ignore=*)   IGNORE+=("${1#--ignore=}"); shift ;;
         -h|--help)    usage; exit 0 ;;
         --base|--cache|--snapshot|--partial|--probe-json)
             PASSTHRU+=("$1"); shift
@@ -132,7 +163,7 @@ while [[ $# -gt 0 ]]; do
             PASSTHRU+=("$1"); shift ;;
         --base=*|--cache=*|--snapshot=*|--probe-json=*)
             PASSTHRU+=("$1"); shift ;;
-        --allow-fast) PASSTHRU+=("$1"); shift ;;
+        --allow-fast) ALLOW_FAST=1; PASSTHRU+=("$1"); shift ;;
         -*) log "error: unknown option: $1"; usage >&2; exit 2 ;;
         *)  POSITIONAL+=("$1"); shift ;;
     esac
@@ -557,14 +588,42 @@ cmd_diff() {
 
 # --- affected ---------------------------------------------------------------
 
-# The citation map: every KB URL the skills cite, as url<TAB>file<TAB>line.
+# The citation map: every KB article URL the skills cite, as url<TAB>file<TAB>line.
 # Computed at run time against the working tree so it cannot go stale the way a
-# committed index would.
+# committed index would. Fenced code blocks are skipped: a URL inside an example
+# is an illustration, not a citation, and would otherwise report as dead.
 citation_map() {
-    ( cd "$ROOT" && grep -rnoE 'https://gridpane\.com/kb/[A-Za-z0-9._-]+' \
-        "$SKILLS_DIR" --include='*.md' 2>/dev/null \
-      | sed -E 's#^([^:]+):([0-9]+):(https://gridpane\.com/kb/[A-Za-z0-9._-]+)$#\3\t\1\t\2#' \
-      || true )
+    ( cd "$ROOT" && find "$SKILLS_DIR" -type f -name '*.md' -exec awk '
+        BEGIN { PREFIX = "https://gridpane.com/kb/" }
+        FNR == 1 { infence = 0; fchar = ""; flen = 0 }
+        {
+            probe = $0
+            sub(/^[ \t]+/, "", probe)
+            if (probe ~ /^(```|~~~)/) {
+                c = substr(probe, 1, 1)
+                n = 0
+                while (substr(probe, n + 1, 1) == c) n++
+                if (infence) {
+                    if (c == fchar && n >= flen) { infence = 0; fchar = ""; flen = 0 }
+                } else {
+                    infence = 1; fchar = c; flen = n
+                }
+                next
+            }
+            if (infence) next
+
+            rest = $0
+            while ((p = index(rest, PREFIX)) > 0) {
+                rest = substr(rest, p + length(PREFIX))
+                body = ""
+                while (length(rest) > 0) {
+                    ch = substr(rest, 1, 1)
+                    if (ch ~ /[A-Za-z0-9._-]/) { body = body ch; rest = substr(rest, 2) }
+                    else break
+                }
+                if (body != "") printf "%s%s\t%s\t%s\n", PREFIX, body, FILENAME, FNR
+            }
+        }' {} + 2>/dev/null || true )
 }
 
 # Join the snapshot diff to the citation map: the answer to "which skill files
@@ -664,6 +723,302 @@ cmd_affected() {
     log "$changed_count changed, $cited cited, $references references in $files files (${prev}..${curr})"
 }
 
+# --- audit ------------------------------------------------------------------
+
+# The date a citing file was last committed, as YYYY-MM-DD. A fixture or an
+# uncommitted file falls back to its `Last verified:` line; an empty result means
+# the staleness check cannot speak about that file.
+file_committed() {
+    local file="$1" dir base d
+    dir="$(dirname "$file")"
+    base="$(basename "$file")"
+    d="$(git -C "$dir" log -1 --format=%cs -- "$base" 2>/dev/null || true)"
+    if [[ -z "$d" && -f "$file" ]]; then
+        d="$(sed -nE 's/^Last verified: ([0-9]{4}-[0-9]{2}-[0-9]{2})$/\1/p' "$file" | head -1)"
+    fi
+    printf '%s' "$d"
+}
+
+# True when $1 is in --ignore, compared without a trailing slash.
+is_ignored() {
+    local u="${1%/}" i
+    [[ ${#IGNORE[@]} -gt 0 ]] || return 1
+    for i in "${IGNORE[@]}"; do
+        [[ "${i%/}" == "$u" ]] && return 0
+    done
+    return 1
+}
+
+# One request for one URL: "code<TAB>location". --probe-file reads a saved map
+# instead ({url: {status, location}}), which is how the offline test covers it.
+probe_target() {
+    local u="$1" out
+    if [[ -n "$PROBE_FILE" ]]; then
+        out="$(jq -r --arg u "$u" --arg s "$u/" '
+            (.[$u] // .[$s] // empty)
+            | "\(.status // 0)\t\(.location // "")"' "$PROBE_FILE")"
+    elif ! out="$(curl -sS -o /dev/null -A "$UA" --max-time 30 \
+            -w '%{http_code}\t%{redirect_url}' "${u%/}/" 2>/dev/null)"; then
+        out=$'0\t'
+    fi
+    printf '%s\n' "$out"
+}
+
+# Are the citations sound? Four checks that need no network — unknown (a cited
+# slug the manifest does not list), uncited-new (an article added between the
+# last two snapshots that no skill cites), stale (the article was modified after
+# the citing file was last committed) and coverage (distinct articles cited, per
+# skill) — plus --probe, which requests the unknown URLs only. unknown, moved and
+# down are unsound citations and exit 3; uncited-new and stale are advisory and
+# leave the exit code alone.
+cmd_audit() {
+    local tmp manifest_path articles=0 cited=0 references=0 files=0
+    local prev="" curr="" have_snapshots=0
+    local n_unknown=0 n_uncited=0 n_stale=0 n_moved=0 n_down=0 findings=0
+    local u f l m d
+    local -a names=()
+    local -A committed=()
+
+    [[ -f "$MANIFEST" ]] || die "no manifest at ${MANIFEST#"$ROOT"/}; run: ${SCRIPT_NAME} refresh"
+    [[ -z "$PROBE_FILE" || -f "$PROBE_FILE" ]] || die "probe fixture not found: $PROBE_FILE"
+
+    tmp="$(mktemp -d)"
+    AUDIT_TMP="$tmp"
+    manifest_path="${MANIFEST#"$ROOT"/}"
+
+    articles="$(jq -r '.entries | length' "$MANIFEST")"
+    jq -r '.entries[]
+        | [(.url | sub("/$"; "")), (.modified // ""), (.title // "")]
+        | @tsv' "$MANIFEST" | LC_ALL=C sort > "$tmp/known"
+
+    citation_map | LC_ALL=C sort -u > "$tmp/cites"
+
+    read -r cited references files <<<"$(awk -F'\t' '
+        NF >= 3 { if (!u[$1]++) c++; r++; if (!f[$2]++) fl++ }
+        END { print c + 0, r + 0, fl + 0 }' "$tmp/cites")"
+
+    # unknown: cited but absent from the manifest.
+    awk -F'\t' 'NR == FNR { known[$1] = 1; next }
+        NF >= 3 && !($1 in known) { print }' "$tmp/known" "$tmp/cites" \
+        | LC_ALL=C sort -t$'\t' -k1,1 -k3,3 > "$tmp/unknown_all"
+    : > "$tmp/unknown"
+    while IFS=$'\t' read -r u f l; do
+        [[ -n "$u" ]] || continue
+        is_ignored "$u" && continue
+        printf '%s\t%s\t%s\n' "$u" "$f" "$l" >> "$tmp/unknown"
+    done < "$tmp/unknown_all"
+    n_unknown="$(awk -F'\t' 'NF { if (!u[$1]++) c++ } END { print c + 0 }' "$tmp/unknown")"
+
+    # uncited-new: an article added between the last two snapshots that no skill
+    # cites. Needs two snapshots; with fewer the check cannot speak.
+    while IFS= read -r u; do
+        [[ -n "$u" ]] && names+=("$u")
+    done < <(snapshot_names | sort -r)
+    : > "$tmp/uncited"
+    if [[ ${#names[@]} -ge 2 ]]; then
+        curr="${names[0]}"
+        prev="${names[1]}"
+        have_snapshots=1
+        jq -r -n --slurpfile a "$CACHE/$prev/manifest.json" \
+            --slurpfile b "$CACHE/$curr/manifest.json" '
+            ($a[0].entries | map(.url | sub("/$"; ""))) as $old
+            | $b[0].entries[]
+            | (.url | sub("/$"; "")) as $u
+            | select(($old | index($u)) == null)
+            | [$u, (.title // ""), (.modified // "")] | @tsv' > "$tmp/added"
+        if [[ -s "$tmp/cites" ]]; then
+            awk -F'\t' 'NR == FNR { cited[$1] = 1; next }
+                NF >= 1 && !($1 in cited) { print }' "$tmp/cites" "$tmp/added" \
+                > "$tmp/uncited_all"
+        else
+            cp "$tmp/added" "$tmp/uncited_all"
+        fi
+        while IFS=$'\t' read -r u f m; do
+            [[ -n "$u" ]] || continue
+            is_ignored "$u" && continue
+            printf '%s\t%s\t%s\n' "$u" "$f" "$m" >> "$tmp/uncited"
+        done < "$tmp/uncited_all"
+    fi
+    n_uncited="$(awk -F'\t' 'NF { c++ } END { print c + 0 }' "$tmp/uncited")"
+
+    # stale: the article's modified date is later than the citing file's last
+    # commit. Only articles the manifest knows; an unknown URL is a different
+    # finding.
+    : > "$tmp/stale"
+    while IFS=$'\t' read -r u f l; do
+        [[ -n "$u" ]] || continue
+        is_ignored "$u" && continue
+        m="$(awk -F'\t' -v u="$u" '$1 == u { print $2; exit }' "$tmp/known")"
+        [[ -n "$m" ]] || continue
+        if [[ -z "${committed[$f]:-}" ]]; then
+            committed["$f"]="$(file_committed "$f")"
+        fi
+        d="${committed[$f]}"
+        [[ -n "$d" ]] || continue
+        if is_older "$d" "${m:0:10}"; then
+            printf '%s\t%s\t%s\t%s\t%s\n' "$u" "${m:0:10}" "$f" "$l" "$d" \
+                >> "$tmp/stale"
+        fi
+    done < "$tmp/cites"
+    n_stale="$(awk -F'\t' 'NF { c++ } END { print c + 0 }' "$tmp/stale")"
+
+    # coverage: distinct articles cited, per skill directory.
+    local skills_abs="$SKILLS_DIR" skills_rel="$SKILLS_DIR"
+    [[ "$skills_abs" = /* ]] || skills_abs="$ROOT/$skills_abs"
+    if [[ "$skills_rel" = /* ]]; then skills_rel="${skills_rel#"$ROOT"/}"; fi
+    awk -F'\t' -v a="$skills_abs" -v r="$skills_rel" '
+        function skill_of(p,  n) {
+            if (index(p, a "/") == 1) p = substr(p, length(a) + 2)
+            else if (index(p, r "/") == 1) p = substr(p, length(r) + 2)
+            n = index(p, "/")
+            return (n > 0) ? substr(p, 1, n - 1) : "(root)"
+        }
+        NF >= 3 {
+            s = skill_of($2)
+            if (!seen[s, $1]++) c[s]++
+        }
+        END { for (s in c) print s "\t" c[s] }' "$tmp/cites" \
+        | LC_ALL=C sort > "$tmp/coverage"
+
+    # --probe: one request per unknown URL, ten seconds apart, never a URL the
+    # manifest already knows. A known URL is sound by construction.
+    : > "$tmp/moved"
+    : > "$tmp/down"
+    if [[ "$PROBE" -eq 1 ]]; then
+        local delay=10 first=1 code loc target
+        if [[ -n "$PROBE_FILE" || "$ALLOW_FAST" -eq 1 ]]; then
+            delay=0
+        fi
+        awk -F'\t' 'NF { if (!u[$1]++) print $1 }' "$tmp/unknown" > "$tmp/probe_urls"
+        while IFS= read -r u; do
+            [[ -n "$u" ]] || continue
+            if [[ "$first" -eq 0 && "$delay" -gt 0 ]]; then sleep "$delay"; fi
+            first=0
+            IFS=$'\t' read -r code loc <<<"$(probe_target "$u")"
+            case "$code" in
+                2??) : ;;
+                301|302|303|307|308)
+                    target="${loc%/}"
+                    if [[ -n "$target" && "$target" != "$u" ]]; then
+                        printf '%s\t%s\t%s\n' "$u" "$code" "$target" >> "$tmp/moved"
+                    fi ;;
+                0) log "warn: probe failed for $u" ;;
+                *) printf '%s\t%s\n' "$u" "$code" >> "$tmp/down" ;;
+            esac
+        done < "$tmp/probe_urls"
+    fi
+    n_moved="$(awk -F'\t' 'NF { c++ } END { print c + 0 }' "$tmp/moved")"
+    n_down="$(awk -F'\t' 'NF { c++ } END { print c + 0 }' "$tmp/down")"
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        jq -n \
+            --arg manifest "$manifest_path" --argjson articles "$articles" \
+            --arg prev "$prev" --arg curr "$curr" --argjson snaps "$have_snapshots" \
+            --argjson cited "$cited" --argjson references "$references" \
+            --argjson files "$files" --argjson n_unknown "$n_unknown" \
+            --argjson n_uncited "$n_uncited" --argjson n_stale "$n_stale" \
+            --argjson n_moved "$n_moved" --argjson n_down "$n_down" \
+            --arg unknown_tsv "$(cat "$tmp/unknown")" \
+            --arg uncited_tsv "$(cat "$tmp/uncited")" \
+            --arg stale_tsv "$(cat "$tmp/stale")" \
+            --arg coverage_tsv "$(cat "$tmp/coverage")" \
+            --arg moved_tsv "$(cat "$tmp/moved")" \
+            --arg down_tsv "$(cat "$tmp/down")" '
+            def rows(s): s | split("\n") | map(select(length > 0)) | map(split("\t"));
+            (rows($unknown_tsv)
+             | group_by(.[0])
+             | map({key: .[0][0],
+                    value: map({file: .[1], line: (.[2] | tonumber)})})
+             | from_entries) as $refs
+            | {
+                manifest: {path: $manifest, articles: $articles},
+                snapshots: (if $snaps == 1 then {prev: $prev, curr: $curr} else null end),
+                counts: {
+                    articles: $articles, cited: $cited, references: $references,
+                    files: $files, unknown: $n_unknown, uncited_new: $n_uncited,
+                    stale: $n_stale, moved: $n_moved, down: $n_down
+                },
+                unknown: (rows($unknown_tsv) | group_by(.[0]) | map({
+                    url: .[0][0],
+                    references: map({file: .[1], line: (.[2] | tonumber)})
+                })),
+                uncited_new: (rows($uncited_tsv)
+                    | map({url: .[0], title: .[1], modified: .[2]})),
+                stale: (rows($stale_tsv) | map({
+                    url: .[0], modified: .[1], file: .[2],
+                    line: (.[3] | tonumber), committed: .[4]
+                })),
+                coverage: (rows($coverage_tsv) | map({
+                    skill: .[0], cited: (.[1] | tonumber), articles: $articles
+                })),
+                moved: (rows($moved_tsv) | map({
+                    url: .[0], status: (.[1] | tonumber), location: .[2],
+                    references: ($refs[.[0]] // [])
+                })),
+                down: (rows($down_tsv) | map({
+                    url: .[0], status: (.[1] | tonumber),
+                    references: ($refs[.[0]] // [])
+                }))
+              }'
+    else
+        printf 'KB citation audit\n'
+        printf '  %-12s %s articles  %s\n' "manifest" "$articles" "$manifest_path"
+        printf '  %-12s %s distinct, %s references in %s files\n' \
+            "cited" "$cited" "$references" "$files"
+        if [[ "$have_snapshots" -eq 1 ]]; then
+            printf '  %-12s %s..%s\n' "snapshots" "$prev" "$curr"
+        else
+            printf '  %-12s fewer than two; uncited-new not checked\n' "snapshots"
+        fi
+        printf '  %-12s %s\n' "unknown" "$n_unknown"
+        printf '  %-12s %s\n' "uncited-new" "$n_uncited"
+        printf '  %-12s %s\n' "stale" "$n_stale"
+        if [[ "$PROBE" -eq 1 ]]; then
+            printf '  %-12s %s\n' "moved" "$n_moved"
+            printf '  %-12s %s\n' "down" "$n_down"
+        else
+            printf '  %-12s not checked (--probe)\n' "moved/down"
+        fi
+
+        if [[ -s "$tmp/coverage" ]]; then
+            printf '\ncoverage (distinct articles cited, of %s)\n' "$articles"
+            while IFS=$'\t' read -r f d; do
+                printf '  %-30s %4s\n' "$f" "$d"
+            done < "$tmp/coverage"
+        fi
+
+        if [[ -s "$tmp/unknown" ]]; then
+            printf '\nunknown (cited but not in the manifest)\n'
+            awk -F'\t' 'NF { if ($1 != prev) { printf "  %s\n", $1; prev = $1 }
+                printf "    %s:%s\n", $2, $3 }' "$tmp/unknown"
+        fi
+        if [[ -s "$tmp/moved" ]]; then
+            printf '\nmoved (redirected; update the citation)\n'
+            awk -F'\t' 'NF { printf "  %s\n    -> %s  HTTP %s\n", $1, $3, $2 }' \
+                "$tmp/moved"
+        fi
+        if [[ -s "$tmp/down" ]]; then
+            printf '\ndown (the URL no longer resolves)\n'
+            awk -F'\t' 'NF { printf "  %s  HTTP %s\n", $1, $2 }' "$tmp/down"
+        fi
+        if [[ -s "$tmp/uncited" ]]; then
+            printf '\nuncited-new (added since %s, no skill cites it)\n' "$prev"
+            awk -F'\t' 'NF { printf "  %s  %s\n", $1, $2 }' "$tmp/uncited"
+        fi
+        if [[ -s "$tmp/stale" ]]; then
+            printf '\nstale (article modified after the citing file was last committed)\n'
+            awk -F'\t' 'NF { printf "  %s\n    modified %s > %s  %s:%s\n", $1, $2, $5, $3, $4 }' \
+                "$tmp/stale"
+        fi
+    fi
+
+    findings=$((n_unknown + n_moved + n_down))
+    log "$n_unknown unknown, $n_moved moved, $n_down down; $n_uncited uncited-new, $n_stale stale (advisory)"
+    if [[ "$findings" -gt 0 ]]; then
+        exit 3
+    fi
+}
+
 # --- extract ----------------------------------------------------------------
 
 cmd_extract() {
@@ -759,6 +1114,7 @@ case "$COMMAND" in
     search)  cmd_search ;;
     diff)    cmd_diff ;;
     affected) cmd_affected ;;
+    audit)   cmd_audit ;;
     extract) cmd_extract ;;
     prune)   cmd_prune ;;
     help)    usage; exit 0 ;;
