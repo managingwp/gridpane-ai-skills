@@ -123,8 +123,8 @@ fail2ban-client set wordpress-extra unbanip 203.0.113.10
 - Default GridPane Security — https://gridpane.com/kb/default-gridpane-security-and-additional-options/
 - Configuring Fail2Ban — https://gridpane.com/kb/configuring-fail2ban-to-prevent-brute-force-attacks/
 - Using Fail2Ban with Cloudflare — https://gridpane.com/kb/using-fail2ban-with-cloudflare/
-- Using Cloudflare with GridPane — https://gridpane.com/kb/using-cloudflare-with-gridpane/
+- Using Cloudflare with GridPane — https://gridpane.com/kb/using-cloudflare-api-integration/
 - Updating Cloudflare Real IPs — https://gridpane.com/kb/updating-cloudflare-real-ips/
 - Introduction to Maldet and ClamAV — https://gridpane.com/kb/an-introduction-to-maldet-and-clamav-malware-scanning/
 
-Last verified: 2026-10-19
+Last verified: 2026-11-06

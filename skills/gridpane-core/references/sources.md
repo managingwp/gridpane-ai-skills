@@ -4,9 +4,12 @@ Every GridPane-specific fact used in the skills is traced here. Re-check the pag
 before relying on a fact; GridPane changes over time.
 
 All pages checked **2026-10-07** unless noted. Pages added on **2026-10-09** are
-marked in the tables below. A maintainer-supplied capture of `/root/gridenv` from
-a real GridPane server (2026-10-09) is the source for the server-state files in
-`gridenv.md`; secret values were redacted before anything was written down.
+marked in the tables below. Four citations were re-pointed on **2026-11-06**
+after the KB renamed the articles: the Cloudflare guide, the 6G WAF guide and the
+two Nginx page-caching guides all dropped `gridpane` from their slugs for shorter
+ones. A maintainer-supplied capture of `/root/gridenv` from a real GridPane
+server (2026-10-09) is the source for the server-state files in `gridenv.md`;
+secret values were redacted before anything was written down.
 
 ## Core
 
@@ -43,13 +46,14 @@ a real GridPane server (2026-10-09) is the source for the server-state files in
 | Understanding Memory (RAM) Usage and Notifications | https://gridpane.com/kb/understanding-memory-ram-usage-and-notifications/ | server-diagnostics |
 | Troubleshooting High Disk Space Usage | https://gridpane.com/kb/troubleshooting-high-disk-space-usage-and-locating-large-files/ | server-diagnostics |
 | Using the GridPane 7G WAF | https://gridpane.com/kb/using-the-7g-web-application-firewall/ | security |
+| Using the GridPane 6G WAF | https://gridpane.com/kb/using-the-6g-web-application-firewall/ | security |
 | Default GridPane Security and Additional Options | https://gridpane.com/kb/default-gridpane-security-and-additional-options/ | security |
 | Configuring Fail2Ban to Prevent Brute Force Attacks | https://gridpane.com/kb/configuring-fail2ban-to-prevent-brute-force-attacks/ | security |
 | Using Fail2Ban with Cloudflare | https://gridpane.com/kb/using-fail2ban-with-cloudflare/ | security |
-| Using Cloudflare with GridPane | https://gridpane.com/kb/using-cloudflare-with-gridpane/ | security |
+| Using Cloudflare with GridPane | https://gridpane.com/kb/using-cloudflare-api-integration/ | security |
 | Updating Cloudflare Real IPs | https://gridpane.com/kb/updating-cloudflare-real-ips/ | security |
-| GridPane FastCGI Page Caching | https://gridpane.com/kb/using-gridpane-nginx-fastcgi-page-caching/ | wordpress |
-| GridPane Redis Page Caching | https://gridpane.com/kb/using-gridpane-nginx-redis-page-caching/ | wordpress |
+| GridPane FastCGI Page Caching | https://gridpane.com/kb/using-nginx-fastcgi-page-caching/ | wordpress |
+| GridPane Redis Page Caching | https://gridpane.com/kb/using-nginx-redis-page-caching/ | wordpress |
 | GridPane Redis Object Caching | https://gridpane.com/kb/using-gridpane-redis-object-caching/ | wordpress |
 | Diagnosing Caching Issues (both header families) | https://gridpane.com/kb/diagnosing-caching-issues/ | wordpress *(added 2026-10-09)* |
 | Exclude a Page or Cookie from Nginx Server Caching | https://gridpane.com/kb/exclude-a-page-from-server-caching/ | wordpress *(added 2026-10-09)* |

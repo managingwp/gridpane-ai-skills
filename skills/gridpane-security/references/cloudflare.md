@@ -98,7 +98,7 @@ access path or the ability to edit the firewall from console). Prefer Cloudflare
 
 ## Sources
 
-- Using Cloudflare with GridPane — https://gridpane.com/kb/using-cloudflare-with-gridpane/
+- Using Cloudflare with GridPane — https://gridpane.com/kb/using-cloudflare-api-integration/
 - Updating Cloudflare Real IPs — https://gridpane.com/kb/updating-cloudflare-real-ips/
 - Cloudflare Caching and GridPane — https://gridpane.com/kb/cloudflare-caching-and-gridpane/
 - Using Fail2Ban with Cloudflare — https://gridpane.com/kb/using-fail2ban-with-cloudflare/

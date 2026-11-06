@@ -186,7 +186,7 @@ The default paranoia level is `1` (same as Nginx).
 
 - Using the 7G WAF — https://gridpane.com/kb/using-the-7g-web-application-firewall/
 - The 7G WAF and OpenLiteSpeed — https://gridpane.com/kb/the-gridpane-7g-web-application-firewall-and-openlitespeed-ols/
-- Using the GridPane 6G WAF — https://gridpane.com/kb/using-the-gridpane-6g-web-application-firewall/
+- Using the GridPane 6G WAF — https://gridpane.com/kb/using-the-6g-web-application-firewall/
 - Using the ModSec WAF — https://gridpane.com/kb/using-the-gridpane-modsec-web-application-firewall/
 
-Last verified: 2026-10-19
+Last verified: 2026-11-06

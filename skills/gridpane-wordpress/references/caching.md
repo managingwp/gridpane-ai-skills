@@ -349,8 +349,8 @@ so validate with `gpols test` first.
 
 ## Sources
 
-- FastCGI Page Caching — https://gridpane.com/kb/using-gridpane-nginx-fastcgi-page-caching/
-- Redis Page Caching — https://gridpane.com/kb/using-gridpane-nginx-redis-page-caching/
+- FastCGI Page Caching — https://gridpane.com/kb/using-nginx-fastcgi-page-caching/
+- Redis Page Caching — https://gridpane.com/kb/using-nginx-redis-page-caching/
 - Redis Object Caching — https://gridpane.com/kb/using-gridpane-redis-object-caching/
 - Diagnosing Caching Issues (both header families) — https://gridpane.com/kb/diagnosing-caching-issues/
 - Exclude a Page or Cookie from Nginx Server Caching (skip configs) — https://gridpane.com/kb/exclude-a-page-from-server-caching/
@@ -361,4 +361,4 @@ so validate with `gpols test` first.
 - OLS Caching and the LiteSpeed Cache Plugin (LSCache) — https://gridpane.com/kb/openlitespeed-ols-caching-and-the-litespeed-cache-plugin-lscache/
 - LSCache for WordPress: verifying cache headers — https://docs.litespeedtech.com/lscache/lscwp/installation/
 
-Last verified: 2026-10-19
+Last verified: 2026-11-06
