@@ -636,7 +636,8 @@ if [[ "$OFFLINE" -eq 0 && "$ALLOW_FAST" -eq 0 && "$DELAY" -lt 10 ]]; then
     log "error: --delay must be at least 10s for live runs; --allow-fast is for fixtures only"
     exit 2
 fi
-if [[ -n "$SNAPSHOT_DIR" && "$OFFLINE" -eq 0 ]]; then
+if [[ -n "$SNAPSHOT_DIR" && "$OFFLINE" -eq 0 ]] \
+    && [[ -z "$SLUG" && "$EXTRACT_ALL" -eq 0 ]]; then
     log "error: --snapshot is for reading; a live run always creates its own snapshot"
     exit 2
 fi

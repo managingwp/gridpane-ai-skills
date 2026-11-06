@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   republishes the tracked `references/docs-manifest.json`. The label was `[READ]`
   in both places.
 
+### Fixed
+
+- `gridpane-kb-docs.sh extract --snapshot SNAPSHOT` now works: the scraper's
+  "live run" guard no longer rejects `--snapshot` when the run is an extraction,
+  which is a read. A snapshot is named against the cache (`--snapshot 2026-10-21-3`),
+  so an older article can be compared with a current one.
+
 ## v0.6.0 - 2026-11-06
 
 ### Added

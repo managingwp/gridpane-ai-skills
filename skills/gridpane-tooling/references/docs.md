@@ -224,7 +224,9 @@ Notes:
   fetching), `--force` (accept a count drop) and `--manifest FILE` (publish
   elsewhere); `--json` is available on `status`, `check`, `refresh`, `list`,
   `search`, `diff` and `prune`. `--base`, `--cache`, `--snapshot`, `--partial`
-  and `--allow-fast` pass through to the scraper.
+  and `--allow-fast` pass through to the scraper. `--snapshot` takes a snapshot
+  name resolved against the cache (or an absolute path); `extract` uses it to read
+  an older snapshot, which is how you compare an article's text across a refresh.
 - Publishing keeps an entry's `fetched_at` when its `sha256` and title are
   unchanged, so the committed manifest only moves where the KB did.
 - The index's own guards run unchanged: a count drop or an `X-WP-Total`

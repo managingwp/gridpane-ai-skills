@@ -75,6 +75,11 @@ printf 'https://gridpane.com/blog/not-kb/\n' > "$SKILLS/x/post.md"
 
 SKILL_MD="$SKILLS/x/SKILL.md"
 
+# A cached API page, so `extract --snapshot` has a body to read. The wrapper
+# resolves a snapshot name against the cache, not against the working directory.
+printf '[{"slug":"a","content":{"rendered":"<p>Hello <b>world</b></p>"}}]\n' \
+    > "$CACHE/2026-01-01/api-page-1.json"
+
 # --- changed and cited ------------------------------------------------------
 
 before_fixtures="$(find "$CACHE" "$SKILLS" -type f -exec sha256sum {} + \
@@ -162,6 +167,15 @@ fi
 grep -q 'one snapshot only' "$WORK/err-one" \
     || fail "a single snapshot did not explain itself"
 ok "a single snapshot exits non-zero with a PREV hint"
+
+# --- extract from a named snapshot ------------------------------------------
+
+out_extract="$("$CLI" extract --slug a --snapshot 2026-01-01 --cache "$CACHE" 2>&1)"
+grep -q 'wrote .*2026-01-01/a.md' <<<"$out_extract" \
+    || fail "extract --snapshot did not write the extracted body: $out_extract"
+grep -q 'Hello' "$CACHE/2026-01-01/a.md" \
+    || fail "extract --snapshot wrote no article text"
+ok "extract reads a named snapshot without --offline"
 
 # --- help -------------------------------------------------------------------
 
