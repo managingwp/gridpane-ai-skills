@@ -137,7 +137,7 @@ Repository tooling, run from a clone:
 | `scripts/build-zips.sh` | Build `dist/<skill>.zip` for each skill and `dist/gridpane-skills-all.zip`. Standalone archives bundle the core and sibling references they cite; output is deterministic and size-checked |
 | `scripts/git-squash-release.sh` | Vendored release helper. A release assigns the version from the last tag to `VERSION`, both Claude manifests and `CHANGELOG.md`, then squashes commits and tags |
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
-| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
+| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
 
 Shipped with the skills and used by them:
 
