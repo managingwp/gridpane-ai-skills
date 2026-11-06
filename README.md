@@ -21,6 +21,7 @@ These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or 
 | `gridpane-security` | 7G/6G WAF (6G is Nginx-only), ModSecurity, Fail2ban, Cloudflare real-IP/proxy setup, and compromised-site first response | Read / Write |
 | `gridpane-api` | Fleet-wide inventory and actions through the GridPane REST API | Read / Write |
 | `gridpane-tooling` | Building, deploying or debugging custom tooling on a GridPane server: the `/usr/local/bin` + `lib/` scripts, the `gp` dispatcher, config/log locations, monit hooks and the docs manifest | Read |
+| `gridpane-kb-refresh` | Refreshing the GridPane Knowledge Base and the skills that cite it: drift check, snapshot, the files a changed article affects, and the gate | Read → Write |
 
 **Mode** describes what the skill may do by default. *Read* skills only inspect. *Write* skills propose changes and run them only after explicit confirmation (see [Safety model](#safety-model)).
 
@@ -66,7 +67,7 @@ npx skills list
 
 ### claude.ai (chat)
 
-There are two routes. Both install the same nine skills, and neither gives the chat sandbox SSH access to your server.
+There are two routes. Both install the same ten skills, and neither gives the chat sandbox SSH access to your server.
 
 #### Plugin marketplace
 
@@ -221,6 +222,8 @@ gridpane-ai-skills/
 │   ├── gridpane-tooling/
 │   │   ├── references/     # docs.md, docs-manifest.json, gp-command-reference.md, ...
 │   │   └── scripts/        # scrape-docs.sh, scrape-changelog.sh
+│   ├── gridpane-kb-refresh/
+│   │   └── references/     # pipeline.md
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh

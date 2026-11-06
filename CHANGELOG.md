@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `gridpane-kb-refresh`: the Knowledge Base refresh loop as its own skill — drift
+  check, dated snapshot, `affected` to name the files a changed article touches,
+  the edit, and the gate — with `references/pipeline.md` carrying the command
+  table, exit codes, snapshot layout, change set and guards it depends on.
 - `scripts/gridpane-kb-docs.sh affected`: joins a snapshot diff to the KB URLs
   the skills cite and prints `status`, `url` and `file:line` per citation, so a
   KB refresh names the files to edit instead of a manual grep. Read-only,
@@ -18,11 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `gridpane-tooling`: the description now covers scraping and refreshing the
-  Knowledge Base, the body gains a `## Refreshing the Knowledge Base` section,
-  and `references/docs.md` carries the refresh-and-update loop end to end.
-  `AGENTS.md` §"Refreshing KB facts" routes to that section instead of repeating
-  it.
+- The KB refresh trigger moved out of `gridpane-tooling`, which goes back to
+  server tooling only; `gridpane-tooling/references/docs.md` keeps the CLI
+  contract and points at the new skill for the procedure. `AGENTS.md`
+  §"Refreshing KB facts" routes the same way.
 - `refresh` is labelled `[WRITE]` in `gridpane-tooling` and `AGENTS.md`: it
   republishes the tracked `references/docs-manifest.json`. The label was `[READ]`
   in both places.

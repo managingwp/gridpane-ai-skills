@@ -24,6 +24,7 @@
     "./skills/gridpane-core",
     "./skills/gridpane-gp-cli",
     "./skills/gridpane-incident-triage",
+    "./skills/gridpane-kb-refresh",
     "./skills/gridpane-nginx-config",
     "./skills/gridpane-security",
     "./skills/gridpane-server-diagnostics",
