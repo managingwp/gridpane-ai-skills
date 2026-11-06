@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- KB manifest refreshed to 389 articles (fetched 2026-11-06): 2 added, 9
+  body-changed, 0 removed since 2026-10-21. The two cited articles differ only in
+  image markup, so no reference file needed editing.
 - The KB refresh trigger moved out of `gridpane-tooling`, which goes back to
   server tooling only; `gridpane-tooling/references/docs.md` keeps the CLI
   contract and points at the new skill for the procedure. `AGENTS.md`

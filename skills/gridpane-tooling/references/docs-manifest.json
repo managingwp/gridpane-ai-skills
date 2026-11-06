@@ -2,8 +2,8 @@
   "schema": 2,
   "source": "api",
   "base": "https://gridpane.com",
-  "fetched_at": "2026-10-21T20:21:42Z",
-  "count": 387,
+  "fetched_at": "2026-11-06T10:26:18Z",
+  "count": 389,
   "entries": [
     {
       "url": "https://gridpane.com/kb/a-beginners-guide-to-fortress/",
@@ -506,7 +506,7 @@
       "url": "https://gridpane.com/kb/checks-for-migrating-cloning/",
       "title": "Checks When Migrating/Cloning From One Server to Another",
       "lastmod": "",
-      "modified": "2022-10-10T18:23:29",
+      "modified": "2026-10-29T11:47:12",
       "published": "2022-10-10T13:01:54",
       "categories": [
         "Server Management",
@@ -515,8 +515,8 @@
         "Working with Servers"
       ],
       "source": "api",
-      "sha256": "b21f5cf65d7d3764a742187095011d062975a724813379f447c6cd77188eceac",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "9117e4216e902008e7b355756cdf25b88cebb4fa7df3f9a4e5948478a5175d9a",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/client-portal-and-gridpane/",
@@ -536,29 +536,29 @@
       "url": "https://gridpane.com/kb/clone-over-an-existing-site/",
       "title": "Clone Over an Existing Site",
       "lastmod": "",
-      "modified": "2022-05-06T09:39:40",
+      "modified": "2026-10-29T12:10:27",
       "published": "2021-12-02T21:34:20",
       "categories": [
         "Website Cloning",
         "Website Management"
       ],
       "source": "api",
-      "sha256": "5570be096f4c57bf18a691d2ab1a3845ac52311e4936bc8eb625197cee3f5e85",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "be94195222c2b173b92898db5afd1c6157333e2a3b233b72685509f15e20663d",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/cloning-a-duplicate-site-with-a-new-url-to-a-different-server/",
       "title": "Cloning a site to a new URL on a different server",
       "lastmod": "",
-      "modified": "2023-12-29T09:31:35",
+      "modified": "2026-10-29T12:13:01",
       "published": "2020-01-26T01:40:47",
       "categories": [
         "Website Cloning",
         "Website Management"
       ],
       "source": "api",
-      "sha256": "0ff76d4efcf7ee4b654f72b9fce526b94a67f65e6eede2bb46f62c18472ae834",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "87639033a5c9b0df246c2343e95a00d1136cb3e22cf32f4f3595ae2c2a12f4bc",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/cloning-a-duplicate-site-with-a-new-url-to-the-same-server/",
@@ -578,29 +578,29 @@
       "url": "https://gridpane.com/kb/cloning-a-duplicate-site-with-the-same-url-to-a-different-server/",
       "title": "Cloning a site with the same URL to a different server",
       "lastmod": "",
-      "modified": "2025-03-10T10:17:33",
+      "modified": "2026-10-29T12:06:00",
       "published": "2020-06-19T08:55:53",
       "categories": [
         "Website Cloning",
         "Website Management"
       ],
       "source": "api",
-      "sha256": "48ff8d4b094601d2119a505c650fbf79be8e19a09477b5952716d3518e714bb2",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "870b1b5790691f61870cc7604be19ecf61874ba977519351ee2f5560bf58c126",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/cloning-one-entire-server-to-another/",
       "title": "Cloning One Entire Server to Another",
       "lastmod": "",
-      "modified": "2023-12-29T09:34:56",
+      "modified": "2026-10-29T12:03:22",
       "published": "2020-04-07T01:35:43",
       "categories": [
         "Active Server Management Tasks",
         "Server Management"
       ],
       "source": "api",
-      "sha256": "53840ab063b066888438a4cf3d8625adf03fa42e51ee64bd8a1872369a346b93",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "6c0f09b964429746be59af6f694b6f3f83d5ce78e179c09d707768112441a5b2",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/cloudflare-caching-and-gridpane/",
@@ -616,8 +616,8 @@
         "Website Performance"
       ],
       "source": "api",
-      "sha256": "e9844c587b02bb453a3dcf376daa193d8dd0449091ad83749b4fc7c4a38503f9",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "9121293fc8d1cc1dc0e3fa96d20e94bf4157eafa107d3ee9d40d1322f4691e0d",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/cloudflares-cdn-and-upload-limitations/",
@@ -1034,6 +1034,20 @@
       "source": "api",
       "sha256": "8687cf44ba8bdb4a8423c3ca9121a22e09f43e2f7d7e750dd56bf56a7afd36c8",
       "fetched_at": "2026-10-21T16:48:40Z"
+    },
+    {
+      "url": "https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why/",
+      "title": "Database Versions on Ubuntu 26.04: What Changes and Why",
+      "lastmod": "",
+      "modified": "2026-10-22T12:09:04",
+      "published": "2026-10-22T11:50:13",
+      "categories": [
+        "Database FAQ",
+        "Working with Databases"
+      ],
+      "source": "api",
+      "sha256": "13566de2917791081748206b6f9d66daccd196a35a0af6e0bdf41054465af852",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/default-gridpane-security-and-additional-options/",
@@ -1955,8 +1969,8 @@
         "Website Management"
       ],
       "source": "api",
-      "sha256": "9bf3e1a77acc7a1ba32fa92e1c3b5f3721525b76da4e72253035202b1b602b06",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "06e36318872241348378a1791ca0548cc6cd58e9fc78eb92a2ba86d0b68efcb8",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/how-to-add-your-own-custom-nginx-headers/",
@@ -3136,7 +3150,7 @@
       "url": "https://gridpane.com/kb/migrately/",
       "title": "Migrately – A CLI Tool for Full Server to Server Cloning",
       "lastmod": "",
-      "modified": "2026-10-21T18:40:12",
+      "modified": "2026-10-24T11:43:01",
       "published": "2026-10-06T14:16:54",
       "categories": [
         "Server Cloning",
@@ -3145,8 +3159,8 @@
         "Website Management"
       ],
       "source": "api",
-      "sha256": "7b548fa41d2e1be5480861839654209d800a84b71edb554737adbf0d8e225094",
-      "fetched_at": "2026-10-21T20:21:42Z"
+      "sha256": "5b820b81b7bbc84c9de10e354e7f48d08a75d90b370821b932f3937c74772c63",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/migrating-massive-wordpress-websites-to-gridpane/",
@@ -3161,6 +3175,22 @@
       "source": "api",
       "sha256": "36ecb3c669b39b54ca9e0959c377377b97a595c8a4ca80e1d9d557c5c41ab753",
       "fetched_at": "2026-10-21T16:48:40Z"
+    },
+    {
+      "url": "https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know/",
+      "title": "Migrating to Ubuntu 26.04: What You Need to Know",
+      "lastmod": "",
+      "modified": "2026-10-29T10:59:28",
+      "published": "2026-10-29T10:21:04",
+      "categories": [
+        "Server Cloning",
+        "Server Management",
+        "Website Cloning",
+        "Website Management"
+      ],
+      "source": "api",
+      "sha256": "7275af54cda656727723b4f184366612ed6d8b36dda3f51adee0fd937940202a",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/migrating-websites-away-from-gridpane/",
@@ -4153,9 +4183,9 @@
     },
     {
       "url": "https://gridpane.com/kb/server-updates-what-does-gridpane-take-care-of/",
-      "title": "Server Updates / Maintenance / Security Patches – What Updates Does GridPane Take Care Of?",
+      "title": "Server Updates, Maintenance, & Security Patches – What Updates Does GridPane Take Care Of?",
       "lastmod": "",
-      "modified": "2022-07-13T10:06:03",
+      "modified": "2026-10-26T13:06:09",
       "published": "2020-07-25T19:39:29",
       "categories": [
         "FAQs",
@@ -4166,8 +4196,8 @@
         "Server FAQs"
       ],
       "source": "api",
-      "sha256": "472b675d27c1c549fc67a9ef1235f6baca8ac522b32488f733c497709a6b6250",
-      "fetched_at": "2026-10-21T16:48:40Z"
+      "sha256": "604807b1eca190c3fb446096c2ef10954f118bba1a24e3ea69261dd1ff18cb50",
+      "fetched_at": "2026-11-06T10:26:18Z"
     },
     {
       "url": "https://gridpane.com/kb/service-management-mysql/",
