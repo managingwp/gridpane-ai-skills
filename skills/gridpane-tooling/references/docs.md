@@ -161,7 +161,7 @@ skills/gridpane-tooling/scripts/scrape-docs.sh --since-last --out /tmp/kb-delta.
 
 `scripts/gridpane-kb-docs.sh` is the entry point for the KB: it wraps
 `scrape-docs.sh` (the fetch, diff and extract engine) and manages the snapshots.
-Eight subcommands; only `check`, `refresh` and `status --remote` touch the
+Nine subcommands; only `check`, `refresh` and `status --remote` touch the
 network.
 
 ```bash
@@ -201,6 +201,7 @@ scripts/gridpane-kb-docs.sh prune --keep 5 --yes
 | `list` | no | Articles in the newest snapshot (`--filter`, `--limit`, `--json`) |
 | `search QUERY` | one request | Live KB lookup (`--limit`, `--json`) |
 | `diff [PREV]` | no | Added/removed/changed/title-only between two snapshots |
+| `affected [PREV]` | no | The `file:line` in `skills/` that cites each changed article (`--all`, `--skills DIR`, `--json`) |
 | `extract` | no | `--slug SLUG` or `--all`, `--format text\|markdown` |
 | `prune` | no | Remove old snapshots (`--keep N`, `--yes`); never the newest |
 

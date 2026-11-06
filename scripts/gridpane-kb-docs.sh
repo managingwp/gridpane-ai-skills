@@ -34,6 +34,7 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCRAPER="$ROOT/skills/gridpane-tooling/scripts/scrape-docs.sh"
 MANIFEST="$ROOT/skills/gridpane-tooling/references/docs-manifest.json"
 CACHE="$ROOT/out/gridpane-docs-cache"
+SKILLS_DIR="$ROOT/skills"
 
 COMMAND=""
 OFFLINE=0
@@ -43,7 +44,7 @@ JSON_OUT=0
 FILTER=""
 LIMIT=""
 SLUG=""
-EXTRACT_ALL=0
+ALL=0
 FORMAT=""
 KEEP=""
 YES=0
@@ -65,6 +66,7 @@ Commands:
   list                Articles in the newest snapshot, newest first
   search QUERY        One-request lookup against the live KB
   diff [PREV]         What changed between two snapshots
+  affected [PREV]     Which skill files cite an article that changed between snapshots
   extract             Cached article body as text or markdown
   prune               Remove old snapshots (dry run unless --yes)
   help                Show this help and exit
@@ -73,11 +75,13 @@ Options:
   --offline           refresh: skip the probe and rebuild from the newest snapshot
   --force             refresh: pass --force to the indexer (accept a count drop)
   --json              Print JSON instead of plain lines (status, check, refresh,
-                      list, search, diff, prune)
+                      list, search, diff, affected, prune)
   --filter TEXT       list: keep rows whose slug or title contains TEXT
   --limit N           list/search: at most N rows (list default 20)
   --slug SLUG         extract: the article to convert
-  --all               extract: convert every article in the snapshot
+  --all               extract: convert every article in the snapshot;
+                      affected: also list changed articles no skill cites
+  --skills DIR        affected: scan this tree for citations (default skills/)
   --format text|markdown  extract: output format (default markdown)
   --keep N            prune: snapshots to keep, newest first (default 5)
   --yes               prune: actually delete; without it nothing is removed
@@ -111,7 +115,7 @@ while [[ $# -gt 0 ]]; do
         --limit=*)    LIMIT="${1#--limit=}"; shift ;;
         --slug)       SLUG="${2:?--slug needs a value}"; shift 2 ;;
         --slug=*)     SLUG="${1#--slug=}"; shift ;;
-        --all)        EXTRACT_ALL=1; shift ;;
+        --all)        ALL=1; shift ;;
         --format)     FORMAT="${2:?--format needs a value}"; shift 2 ;;
         --format=*)   FORMAT="${1#--format=}"; shift ;;
         --keep)       KEEP="${2:?--keep needs a value}"; shift 2 ;;
@@ -119,6 +123,8 @@ while [[ $# -gt 0 ]]; do
         --yes)        YES=1; shift ;;
         --manifest)   MANIFEST="${2:?--manifest needs a value}"; shift 2 ;;
         --manifest=*) MANIFEST="${1#--manifest=}"; shift ;;
+        --skills)     SKILLS_DIR="${2:?--skills needs a value}"; shift 2 ;;
+        --skills=*)   SKILLS_DIR="${1#--skills=}"; shift ;;
         -h|--help)    usage; exit 0 ;;
         --base|--cache|--snapshot|--partial|--probe-json)
             PASSTHRU+=("$1"); shift
@@ -549,12 +555,121 @@ cmd_diff() {
     (cd "$ROOT" && "$SCRAPER" "${args[@]}" "${PASSTHRU[@]}")
 }
 
+# --- affected ---------------------------------------------------------------
+
+# The citation map: every KB URL the skills cite, as url<TAB>file<TAB>line.
+# Computed at run time against the working tree so it cannot go stale the way a
+# committed index would.
+citation_map() {
+    ( cd "$ROOT" && grep -rnoE 'https://gridpane\.com/kb/[A-Za-z0-9._-]+' \
+        "$SKILLS_DIR" --include='*.md' 2>/dev/null \
+      | sed -E 's#^([^:]+):([0-9]+):(https://gridpane\.com/kb/[A-Za-z0-9._-]+)$#\3\t\1\t\2#' \
+      || true )
+}
+
+# Join the snapshot diff to the citation map: the answer to "which skill files
+# does this KB change actually touch?". Read-only, offline, no writes.
+cmd_affected() {
+    local prev="" curr="" changed="" cites="" rows=""
+    local changed_count=0 cited=0 references=0 files=0
+    local -a names=()
+
+    while IFS= read -r n; do
+        [[ -n "$n" ]] && names+=("$n")
+    done < <(snapshot_names | sort -r)
+    if [[ ${#names[@]} -eq 0 ]]; then
+        die "no completed snapshots in ${CACHE#"$ROOT"/}; run: scripts/gridpane-kb-docs.sh refresh"
+    fi
+
+    curr="${names[0]}"
+    if [[ -n "${POSITIONAL[0]:-}" ]]; then
+        prev="${POSITIONAL[0]}"
+        [[ -f "$CACHE/$prev/manifest.json" ]] || die "unknown snapshot: $prev"
+    else
+        [[ ${#names[@]} -ge 2 ]] \
+            || die "one snapshot only ($curr); name the earlier one: affected PREV"
+        prev="${names[1]}"
+    fi
+
+    # The same change set `diff` reports: added, changed (body hash), removed,
+    # and title-only. A `modified` timestamp edit alone is not a change.
+    changed="$(jq -r -n --slurpfile a "$CACHE/$prev/manifest.json" \
+        --slurpfile b "$CACHE/$curr/manifest.json" '
+        ($a[0].entries | map({key: .url, value: .}) | from_entries) as $am
+        | ($b[0].entries | map({key: .url, value: .}) | from_entries) as $bm
+        | ( [ $bm | keys[] | select($am[.] == null)
+              | {status: "added", url: .} ]
+          + [ $bm | keys[] | select($am[.] != null
+              and $am[.].sha256 != $bm[.].sha256)
+              | {status: "changed", url: .} ]
+          + [ $am | keys[] | select($bm[.] == null)
+              | {status: "removed", url: .} ]
+          + [ $bm | keys[] | select($am[.] != null
+              and $am[.].sha256 == $bm[.].sha256
+              and $am[.].title != $bm[.].title)
+              | {status: "title", url: .} ] )
+        | .[]
+        | [ .status, (.url | sub("/$"; "")) ] | @tsv')"
+
+    cites="$(citation_map)"
+
+    # One row per citing file:line; --all adds the changed articles no skill
+    # cites, with `-` where a location would be.
+    rows="$(awk -F'\t' -v all="$ALL" '
+        NR == FNR {
+            if (NF >= 3) { n[$1]++; f[$1, n[$1]] = $2; l[$1, n[$1]] = $3 }
+            next
+        }
+        NF >= 2 {
+            if (n[$2] > 0) {
+                for (i = 1; i <= n[$2]; i++)
+                    print $1 "\t" $2 "\t" f[$2, i] ":" l[$2, i]
+            } else if (all == 1) {
+                print $1 "\t" $2 "\t-"
+            }
+        }' <(printf '%s\n' "$cites") <(printf '%s\n' "$changed") \
+        | LC_ALL=C sort -t$'\t' -k1,1 -k2,2 -k3,3)"
+
+    changed_count="$(printf '%s\n' "$changed" \
+        | awk -F'\t' 'NF >= 2 && !seen[$2]++ { c++ } END { print c + 0 }')"
+    read -r cited references files <<<"$(printf '%s\n' "$rows" | awk -F'\t' '
+        NF >= 3 && $3 != "-" {
+            if (!u[$2]++) c++
+            file = $3; sub(/:[0-9]+$/, "", file)
+            if (!f[file]++) fl++
+            r++
+        }
+        END { print c + 0, r + 0, fl + 0 }')"
+
+    if [[ "$JSON_OUT" -eq 1 ]]; then
+        jq -n --arg prev "$prev" --arg curr "$curr" \
+            --argjson changed "$changed_count" --argjson cited "$cited" \
+            --argjson references "$references" --argjson files "$files" \
+            --arg tsv "$rows" '
+            {prev: $prev, curr: $curr,
+             counts: {changed: $changed, cited: $cited,
+                      references: $references, files: $files},
+             rows: ($tsv | split("\n") | map(select(length > 0))
+                    | map(split("\t") | {
+                        status: .[0], url: .[1],
+                        file: (if .[2] == "-" then null
+                               else (.[2] | sub(":[0-9]+$"; "")) end),
+                        line: (if .[2] == "-" then null
+                               else (.[2] | split(":") | .[-1] | tonumber) end)
+                      }))}'
+    elif [[ -n "$rows" ]]; then
+        printf '%s\n' "$rows"
+    fi
+
+    log "$changed_count changed, $cited cited, $references references in $files files (${prev}..${curr})"
+}
+
 # --- extract ----------------------------------------------------------------
 
 cmd_extract() {
     local -a args=()
 
-    if [[ "$EXTRACT_ALL" -eq 1 ]]; then
+    if [[ "$ALL" -eq 1 ]]; then
         args+=(--all)
     else
         [[ -n "$SLUG" ]] || die "extract needs --slug SLUG or --all"
@@ -643,6 +758,7 @@ case "$COMMAND" in
     list)    cmd_list ;;
     search)  cmd_search ;;
     diff)    cmd_diff ;;
+    affected) cmd_affected ;;
     extract) cmd_extract ;;
     prune)   cmd_prune ;;
     help)    usage; exit 0 ;;
