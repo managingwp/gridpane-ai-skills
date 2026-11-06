@@ -302,88 +302,15 @@ A refresh refuses to produce a bad manifest:
 - **`X-WP-Total` is the cheap drift check.** One request with `-o /dev/null -D -`
   tells you whether 387 is still the right number, with no crawl.
 
-## Refreshing the KB and updating the skills
+## Refreshing the KB
 
-The loop that keeps a citation honest when the KB moves. Run it from the
-repository root, never on a server. Steps 1, 2 and 4 are read-only; step 3
-republishes the tracked manifest; steps 5–7 are ordinary documentation edits
-under the `AGENTS.md` rules.
+The procedure — `status` → `check` → `refresh` → `affected` → edit → gate — lives
+in the `gridpane-kb-refresh` skill. This file keeps what the CLI itself needs: the
+command table above, the guards and the date model below.
 
-**1. What we carry, and what drifted.**
-
-```bash
-# [READ] Ingested, cached, extracted and drift. Local state only.
-scripts/gridpane-kb-docs.sh status
-```
-
-**2. Has the KB moved?**
-
-```bash
-# [READ] One request. Exit 0 = nothing changed, 3 = something did.
-scripts/gridpane-kb-docs.sh check
-```
-
-Exit 3 is work, not failure. Any other non-zero exit stops the loop.
-
-**3. Index the new state and diff it.**
-
-```bash
-# [WRITE] Probe, index a dated snapshot, diff it, and publish
-# skills/gridpane-tooling/references/docs-manifest.json only where content
-# changed. Snapshots stay in the gitignored cache. Rollback:
-# git checkout -- skills/gridpane-tooling/references/docs-manifest.json
-scripts/gridpane-kb-docs.sh refresh
-```
-
-A count drop or an `X-WP-Total` mismatch aborts before anything is published.
-`--offline` rebuilds from the newest snapshot without a request.
-
-**4. Which skill files does the change touch?**
-
-```bash
-# [READ] status<TAB>url<TAB>file:line per citation, summary on stderr.
-scripts/gridpane-kb-docs.sh affected
-```
-
-`affected` joins the step 3 diff to the `https://gridpane.com/kb/…` URLs the
-skills cite. The citation map is computed from the working tree on every run, so
-there is no index to keep current. `--all` also lists changed articles nothing
-cites (decide whether one should), `--skills DIR` scans another tree, and
-`--json` emits `{prev, curr, counts, rows}`. It exits 0 whether or not anything
-is cited.
-
-**5. Edit only what step 4 named.** A fact the diff does not report is not part
-of this refresh. Re-stamp that file's `Last verified` date, and leave the rest
-of the prose alone.
-
-**6. Trace and gate.** A new or corrected GridPane fact needs a line in
-`gridpane-core/references/sources.md` like any other. Then:
-
-```bash
-# [READ] Frontmatter, command labels, links, secrets, version agreement.
-scripts/lint-skills.sh
-```
-
-**7. Record it.** A CHANGELOG entry under `## Unreleased` and one conventional
-commit, following `AGENTS.md`.
-
-### What may change, and what must not
-
-- **May:** a wrong fact corrected, a URL added or replaced, a date re-stamped, a
-  gotcha that the changed article now contradicts.
-- **Must not:** verbatim KB prose in `skills/` (the licence question is open —
-  see `OPEN-QUESTIONS.md` §"KB text snapshots"); a rewrite of a section the diff
-  did not justify; a `Last verified` date bumped on a file nobody edited.
-- **A title-only change** (`sha256` identical, title different) means the
-  citation's wording or link text may need updating; the body did not change.
-- **A `modified`-only change** is not reported at all, by design.
-
-### Unattended runs
-
-The scheduled version of this loop is `plans/20261021-weekly-pgf-cron.md`. Its
-tick may run steps 1–4, edit references, add a PGF and commit; it may not push,
-release, or delete a snapshot. A human decides whether a changed article
-justifies more than a citation fix.
+Two rules from that procedure bind anyone editing here as well: only the diff
+justifies a change, and no verbatim KB prose goes into `skills/` while the licence
+question is open (`OPEN-QUESTIONS.md` §"KB text snapshots").
 
 ## Changelog
 

@@ -95,9 +95,9 @@ Clearing cache counts as [WRITE] because it's reversible but has an effect. Relo
 
 ### Refreshing KB facts
 
-`skills/gridpane-tooling/references/docs.md` §"Refreshing the KB and updating the
-skills" is the full procedure, including what may and may not change. This is the
-short version.
+The `gridpane-kb-refresh` skill is the procedure: drift check, snapshot, the files
+a change affects, and the gate. This is the short version, and
+`skills/gridpane-tooling/references/docs.md` is the CLI contract behind it.
 
 ```bash
 # [READ] Local state only: ingested, cached, extracted and drift counts.

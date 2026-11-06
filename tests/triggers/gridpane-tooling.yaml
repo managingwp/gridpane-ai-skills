@@ -12,11 +12,6 @@ should_trigger:
   - "which logs should my gridpane tool write to"
   - "list every top-level gp command from the dispatcher"
   - "how do I regenerate the openlitespeed config with gpols"
-  - "scrape the gridpane knowledge base and update the skills"
-  - "refresh the KB index"
-  - "the gridpane docs moved, what skills need updating"
-  - "which skills cite this KB article"
-  - "how do I check whether the knowledge base changed since our last snapshot"
 
 should_not_trigger:
   - "write a bash script to parse a csv file"

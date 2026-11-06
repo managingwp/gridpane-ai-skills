@@ -53,6 +53,10 @@ Diagnose before touching a file. Every command carries a label: **[READ]**,
 7. **Record it.** A CHANGELOG entry under `## Unreleased` and one conventional
    commit.
 
+An unattended run may do steps 1–4, edit the references they name, and commit. It
+must not push, release, or delete a snapshot, and a change that would alter more
+than a citation is a human decision.
+
 ### 1–2. Diagnose
 
 ```bash
