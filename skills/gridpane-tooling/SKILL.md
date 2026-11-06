@@ -1,9 +1,9 @@
 ---
 name: gridpane-tooling
 description: >-
-  Use to build, deploy or debug custom tooling on a GridPane server:
-  /usr/local/bin and lib scripts, the gp dispatcher, overwritten paths, monit
-  hooks and logs.
+  Use to build or debug GridPane server tooling (gp, /usr/local/bin, overwritten
+  paths, monit hooks, logs) and to scrape, refresh and update the Knowledge Base
+  these skills cite.
 ---
 
 # gridpane-tooling
@@ -28,7 +28,8 @@ Read the reference that matches the task:
 - `references/developing-tools.md` — patterns for adding tooling: placement,
   config I/O, logging, callbacks and monit integration.
 - `references/docs.md` — the KB index (REST feed, plus a sitemap fallback),
-  one-request search, text extraction, and the changelog capture.
+  one-request search, text extraction, the changelog capture, and the
+  refresh-and-update loop.
 
 ## Prerequisites
 
@@ -96,6 +97,41 @@ a managed file, `bash -n`/`shellcheck` pass, and its effect is observable.
 Not applicable to the reference itself. Any tool that writes must carry its own
 backup and rollback and follow the `gridpane-core` safety protocol.
 
+## Refreshing the Knowledge Base
+
+The skills cite KB URLs; they do not ship KB prose. When the KB moves, this is
+the loop that keeps the citations honest. Run it from the repository root, never
+on a server. The full procedure, every flag and the refused steps are in
+`references/docs.md` §"Refreshing the KB and updating the skills".
+
+```bash
+# [READ] What we carry, what is cached, extracted and drifted. No network.
+scripts/gridpane-kb-docs.sh status
+```
+
+```bash
+# [READ] One request. Exit 0 = nothing changed, 3 = something did.
+scripts/gridpane-kb-docs.sh check
+```
+
+```bash
+# [WRITE] Probe, index a dated snapshot, diff it, and publish the manifest only
+# where content changed. Effect: skills/gridpane-tooling/references/docs-manifest.json
+# may be rewritten; snapshots stay in the gitignored cache. Rollback:
+# git checkout -- skills/gridpane-tooling/references/docs-manifest.json
+scripts/gridpane-kb-docs.sh refresh
+```
+
+```bash
+# [READ] Which skill files cite each changed article:
+# status<TAB>url<TAB>file:line, plus a summary on stderr.
+scripts/gridpane-kb-docs.sh affected
+```
+
+Then edit only the files `affected` named, re-stamp each edited file's
+`Last verified` date, record any new GridPane fact in
+`gridpane-core/references/sources.md`, and run `scripts/lint-skills.sh`.
+
 ## Gotchas
 
 - **`gpupdate` replaces `/usr/local/bin` and `lib/`.** Hand edits there are
@@ -107,6 +143,16 @@ backup and rollback and follow the `gridpane-core` safety protocol.
 - **Secrets live on disk.** `/root/gridcreds/` and `/root/gridenv` hold
   credentials; never print or commit them.
 - **Nginx vs OLS.** Config and log paths differ; confirm the stack first.
+- **A `modified` timestamp edit is not a KB change.** `refresh` publishes the
+  manifest only where the content hash or the title moved, so a page that only
+  re-dated itself does not create a diff to act on.
+- **`check` exit 3 is work, not failure.** It means the KB moved; the loop
+  continues with `refresh`. Any other non-zero exit stops the loop.
+- **`affected` is the only step that names the files to edit.** Do not hand-grep
+  for KB URLs: the command already joins the diff to the `file:line` citations
+  and reports a title-only change as well as a body change.
+- **No KB prose in `skills/`.** The licence question is still open
+  (`OPEN-QUESTIONS.md`); cite the URL and write the fact in our own words.
 
 ## Sources
 

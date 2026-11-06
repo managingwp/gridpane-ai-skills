@@ -12,6 +12,11 @@ should_trigger:
   - "which logs should my gridpane tool write to"
   - "list every top-level gp command from the dispatcher"
   - "how do I regenerate the openlitespeed config with gpols"
+  - "scrape the gridpane knowledge base and update the skills"
+  - "refresh the KB index"
+  - "the gridpane docs moved, what skills need updating"
+  - "which skills cite this KB article"
+  - "how do I check whether the knowledge base changed since our last snapshot"
 
 should_not_trigger:
   - "write a bash script to parse a csv file"
@@ -19,3 +24,5 @@ should_not_trigger:
   - "add a custom nginx rule to block xmlrpc on example.com"
   - "build me a wordpress plugin that adds a shortcode"
   - "how do I install nginx on a fresh ubuntu box"
+  - "what gp command clears the fastcgi cache for a site"
+  - "postgres is using all the memory on our database server"
