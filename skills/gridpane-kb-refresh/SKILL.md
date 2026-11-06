@@ -155,9 +155,10 @@ A refresh is correct when all three hold:
 - **`refresh` is deliberately slow.** It waits ten seconds between requests; a
   full run is a few minutes, not a few seconds. Do not lower the delay for a live
   run.
-- **`affected` scans `skills/` only.** README, `AGENTS.md` and `CHANGELOG` also
-  cite KB URLs and are not in its output; check them by hand when an article that
-  they cite changes.
+- **`affected` scans `skills/` only, and that is the whole citation set.** README
+  and `AGENTS.md` link the KB home (`https://gridpane.com/kb/`), not an article,
+  and `CHANGELOG.md` carries no KB link, so there is nothing outside `skills/` to
+  check by hand.
 - **No KB prose in `skills/`.** The licence question for redistributing article
   text is unresolved (`OPEN-QUESTIONS.md` §"KB text snapshots"). Cite the URL and
   write the fact in our own words.

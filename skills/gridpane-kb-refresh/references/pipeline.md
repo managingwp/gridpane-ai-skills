@@ -128,5 +128,6 @@ distinct ones at least one skill references, `references` the number of
 `file:line` rows, and `files` the distinct files. With `--all`, uncited articles
 appear with `"file": null, "line": null` and a `-` in the plain output.
 
-The scan covers `skills/**/*.md` and nothing else: `README.md`, `AGENTS.md` and
-`CHANGELOG.md` also cite KB URLs and are checked by hand.
+The scan covers `skills/**/*.md`, which is the whole citation set: `README.md` and
+`AGENTS.md` link the KB home rather than an article, and `CHANGELOG.md` links no
+KB page at all.
