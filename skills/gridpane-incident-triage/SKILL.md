@@ -2,8 +2,8 @@
 name: gridpane-incident-triage
 description: >-
   Use when a GridPane site is down, slow, white-screening, returning
-  502/503/504/500, or its SSL fails. Routes to the diagnostics, security and
-  WordPress skills.
+  502/503/504/500, its SSL fails, or a clone or restore is refused. Routes to the
+  diagnostics, security and WordPress skills.
 ---
 
 # gridpane-incident-triage
@@ -70,6 +70,7 @@ tail -n 50 /var/log/nginx/example.com.error.log
 | DB connection error | MySQL service; error log; processlist | MySQL down; too many connections; disk full | `server-diagnostics/mysql` | Restart MySQL ([WRITE]); raise connections |
 | Backup spinner / backup "succeeds" with no revision | `active.backups.monitoring.log`; `backups.env` toggles; `TS_SOCKET=/tmp/ts-socket-backups.0 tsp -l` | Scheduled run no-opped (toggle off); no completion callback; hung job holding the single queue slot | `gp-cli/references/backups.md` | Run a manual backup ([WRITE]); post the callback; fix the toggle/cron mismatch |
 | Backups missing after accidental deletion/recreation | Historical `backup.log` with context; storage-specific IDs and original bucket | Initialization without a revision; disabled backups; recreated site uses different storage | `gp-cli/references/missing-backups.md` | Discover existing revisions first; hand off exhausted sources to support/provider recovery |
+| Clone or restore refused | Both ends' engine and version; `/opt/gridpane/last-restore.log`; the dump's `.gp-dump-version` | Destination engine cannot hold the source's columns or collations; mydumper generation mismatch; timeout hit | `gp-cli/references/backups.md`, `server-diagnostics/mysql.md` | Move the site to a matching engine ([DESTRUCTIVE]); raise the timeout ([WRITE]) |
 
 ## 502 Bad Gateway
 
@@ -153,6 +154,40 @@ curl -sSI https://example.com | grep -iE '^HTTP|^location'
 
 Hand off to `gridpane-security/references/cloudflare.md` and `gridpane-wordpress`.
 
+## Clone or restore refused
+
+A refusal is a guard, not a fault. GridPane checks the destination before it
+touches the destination database, then notifies:
+
+| Notification | Meaning |
+|---|---|
+| `Clone Refused -- …` | Clone stopped before anything was copied or dropped; the destination site is exactly as it was. |
+| `Restore Issue` | Restore stopped before the destination database was touched. |
+
+The destination database is intact in both cases — but a restore's **files** may
+already have been restored by the time the database check runs, so do not tell
+the user the site is untouched.
+
+```bash
+# [READ] What did the last restore refuse, and is an override in place?
+tail -n 40 /opt/gridpane/last-restore.log
+ls -l /root/allow.collation.mismatch 2>/dev/null || echo "no override present"
+```
+
+The two usual causes are an engine that cannot represent the source's data
+(compare `SELECT VERSION()` on both ends; see
+`server-diagnostics/references/mysql.md`) and a dump whose mydumper generation
+the destination's myloader cannot load (`gp-cli/references/backups.md`). A
+third is simply the 3-hour dump or load limit, which fails a very large database
+that is otherwise fine.
+
+There is an override, `/root/allow.collation.mismatch`, that lets the import
+proceed and produces a **partial** database: an unsupported collation makes
+myloader's `ERROR 1273` shut down every thread, so only the tables already
+loaded survive, and which ones those are varies run to run. Do not create it. If
+it exists and you did not put it there, treat the last restore as suspect and
+compare the table count against the dump.
+
 ## Verify
 
 The incident is resolved when the original symptom no longer reproduces **and**
@@ -187,4 +222,4 @@ known-good state; for a service restart, the rollback is the service coming back
 
 See `references/rca-template.md` for the write-up format.
 
-Last verified: 2026-10-07
+Last verified: 2026-11-05

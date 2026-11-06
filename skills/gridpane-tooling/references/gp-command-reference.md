@@ -95,12 +95,12 @@ Enrolment is suspended; `add`/`remove` operands are refused with exit `2`
 
 | Command | Purpose | Label |
 |---|---|---|
-| `gp stack nginx …` | Nginx directives (`stack::configure_nginx`) | [WRITE] |
+| `gp stack nginx {worker\|server-name\|limits\|open-file-cache\|fastcgi\|proxy\|redis\|geoip} …` | Nginx directives, server-wide or `-site-*` per site (`stack::configure_nginx`) | [WRITE] |
 | `gp stack php …` / `php opcache` / `php install` | PHP settings, OPcache, install (`installphp`) | [WRITE] |
 | `gp stack mysql …` | MySQL/MariaDB settings | [WRITE] |
 | `gp stack redis \| redis-page \| redis-object …` | Redis settings | [WRITE] |
 | `gp stack ols …` | OpenLiteSpeed settings | [WRITE] |
-| `gp stack geoip …` | GeoIP config | [WRITE] |
+| `gp stack nginx geoip …` | GeoIP config (KB form; earlier notes used `gp stack geoip` — confirm with `gp stack nginx --help`) | [WRITE] |
 | `gp stack maldet …` | Maldet config | [WRITE] |
 | `gp stack elasticsearch …` | Elasticsearch config | [WRITE] |
 | `gp stack *-fail2ban-jail` | Enable/disable a Fail2ban jail | [WRITE] |

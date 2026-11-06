@@ -50,9 +50,23 @@ the skill and reference file that mentions it, plus what would confirm it.
   and three Monit services); the split services read `/etc/redis/redis-page.conf`
   and `/etc/redis/redis-object.conf`. Whether the coexisting `redis.env` has any
   effect remains open (`gridpane-core/references/gridenv.md`).
+- **MariaDB vector search (2026-11-05).** A GridPane staff answer on the
+  community forum (2026-09-25) describes how vector data behaves on MariaDB 11.8
+  servers: `VECTOR` columns and vector indexes need 11.7+, a database containing
+  a vector index restores one thread per table because parallelised myloader
+  deadlocks, the index is rebuilt on every restore rather than copied, the vector
+  index cache defaults to 16 MB, and a refused clone reports
+  `Clone Refused - DB Column Type`. The 2026-10-14 `gpcli` snapshot contains no
+  `VECTOR` handling at all, so none of it is confirmed in code. Confirm against a
+  newer capture, and record the thread URL
+  (`gridpane-core/references/stack-overview.md`,
+  `gridpane-server-diagnostics/references/mysql.md`,
+  `gridpane-gp-cli/references/backups.md`).
 - **MariaDB vs MySQL.** The captured stack is Percona and the scripts detect
-  MariaDB (`lib/services.sh`), referencing `mysql.service`. Confirm the unit names
-  on a MariaDB box (`gridpane-server-diagnostics/references/mysql.md`).
+  MariaDB (`lib/services.sh`), referencing `mysql.service`. The engine and
+  version per OS stack are now recorded in
+  `gridpane-core/references/stack-overview.md`; what is still open is the unit
+  names on a MariaDB box (`gridpane-server-diagnostics/references/mysql.md`).
 - **Panel local backups use the scheduled path.** On one server a panel-triggered
   local backup arrived as a `-single-site local` task (an entry in
   `active.backups.monitoring.log`, none in `manual-backups.log`) and therefore

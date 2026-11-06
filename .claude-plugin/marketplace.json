@@ -1,6 +1,6 @@
 {
   "name": "managingwp-gridpane",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "GridPane Agent Skills, packaged as one Claude plugin.",
   "owner": {
     "name": "managingwp",
@@ -10,7 +10,7 @@
     {
       "name": "gridpane",
       "source": "./",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "description": "Agent Skills for diagnosing, tuning and securing GridPane-managed WordPress servers.",
       "homepage": "https://github.com/managingwp/gridpane-ai-skills",
       "repository": "https://github.com/managingwp/gridpane-ai-skills",

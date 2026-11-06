@@ -11,6 +11,8 @@ should_trigger:
   - "wordpress shows a white screen on gridpane"
   - "the ssl certificate failed to renew on gridpane"
   - "an openlitespeed site on gridpane is returning 503"
+  - "a gridpane clone was refused and mentioned an unsupported db column type"
+  - "the restore stopped with a restore issue notification and the database was not dropped"
 
 should_not_trigger:
   - "tune php-fpm max_children for better performance across the server"

@@ -111,6 +111,47 @@ Per-site overrides (positional `{site.url}` last):
 | [WRITE] | `gp stack redis-page -maxmemory {MB}` (split-Redis servers) |
 | [WRITE] | `gp stack redis-object -maxmemory {MB}` (split-Redis servers) |
 
+## Nginx stack
+
+`gp stack nginx {group} {flag} …` writes Nginx configuration. Without a `{site.url}`
+the flag is server-wide; `limits`, `fastcgi` and `proxy` also accept `-site-*`
+flags with `{site.url}` last, which is how one site is tuned without touching the
+others. Full flag list per group: Configure Nginx (see Sources in `SKILL.md`).
+
+| Label | Group | Flags |
+|---|---|---|
+| [WRITE] | `worker` | `-connections {int}`, `-rlimit-nofile {int}` |
+| [WRITE] | `server-name` | `-in-redirect on\|off`, `-hash-bucket-size {int}` |
+| [WRITE] | `limits` | `-client-body-buffer-size`, `-client-body-timeout`, `-client-header-buffer-size`, `-client-header-timeout`, `-keepalive-requests`, `-keepalive-timeout`, `-large-client-header-buffers {qty} {size}`, `-req-zone-one {store.mb} {req/s}`, `-req-zone-wp {store.mb} {req/s}`, `-reset-timedout-connection`, `-send-timeout`, `-types-hash-max-size` |
+| [WRITE] | `limits` (per site) | `-site-zone-one-burst {n} {site.url}`, `-site-zone-wp-burst {n} {site.url}`, `-site-max-body-size {MB} {site.url}` |
+| [WRITE] | `open-file-cache` | `-max {elements} -inactive {timeout}`, `-errors on\|off`, `-min-uses {int}`, `-valid {int}` |
+| [WRITE] | `fastcgi` | `-buffering`, `-buffers {qty} {size}`, `-buffer-size`, `-busy-buffers-size`, `-cache-background-update`, `-max-cache-size`, `-cache-revalidate`, `-connect-timeout`, `-keep-connections`, `-read-timeout`, `-send-timeout`, `-site-cache-valid {seconds} {site.url}` |
+| [WRITE] | `proxy` | the same flags as `fastcgi`, including `-site-cache-valid {seconds} {site.url}` |
+| [WRITE] | `redis` | `-site-cache-valid {seconds} {site.url}` |
+| [WRITE] | `geoip` | `-on {account.id}:{license.key}`, `-off`, `-update {CC}:{yes\|no},…`, `-remove {CC},…` |
+
+### Per-site page-cache TTL
+
+Each page-cache type has its own `-site-cache-valid`, and it only writes the
+directive for that cache type:
+
+| Cache type | Command | Directive and file | Default |
+|---|---|---|---|
+| Redis | `gp stack nginx redis -site-cache-valid {seconds} {site.url}` | `redis2_query expire $key $cache_ttl` in `/etc/nginx/common/{site.url}-wp-redis.conf`, `-proxy-http-rediscache.conf`, `-proxy-https-rediscache.conf` | `2592000` (30 days) |
+| FastCGI | `gp stack nginx fastcgi -site-cache-valid {seconds} {site.url}` | `fastcgi_cache_valid` in `/etc/nginx/common/{site.url}-fcgi-cache-var.conf` | `1` |
+| Proxy | `gp stack nginx proxy -site-cache-valid {seconds} {site.url}` | `proxy_cache_valid` in `/etc/nginx/common/{site.url}-proxy-cache-var.conf` | `1` |
+
+Choose the form that matches the site's recorded `cache-type`
+(`/var/www/{site.url}/logs/{site.url}.env`); the `redis` form on a FastCGI site
+does not change what that site serves. Passing the default value changes nothing
+except the config rewrite.
+
+- Effect: the TTL before a cached 200 response is refetched — one site only.
+- Rollback: re-run with the previous value (or the default above).
+- Verify: `gp ngx -t`, then the TTL key in the site env and a cache header as in
+  `gridpane-wordpress/references/caching.md`. Reload with `gp ngx -reload` if the
+  site still serves the old TTL.
+
 ## Caching
 
 | Label | Command | Notes |

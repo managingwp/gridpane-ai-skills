@@ -296,6 +296,32 @@ gp site example.com -redis-object-caching on
 Rollback for each: reverse the toggle (`-cache-off`, or `-redis-object-caching
 off`), or re-enable the previous method and restore its TTL.
 
+### Changing the TTL alone
+
+To change the TTL of a site that is already cached, do not re-run the enable
+command — set the per-site TTL for its cache type. All are [WRITE], one site:
+
+```bash
+# [WRITE] Redis page cache TTL, 30 days (the default). Per site; no other site
+# changes. Rollback: re-run with the previous value.
+gp stack nginx redis -site-cache-valid 2592000 example.com
+```
+
+```bash
+# [WRITE] FastCGI page cache TTL (default 1s).
+gp stack nginx fastcgi -site-cache-valid 300 example.com
+```
+
+```bash
+# [WRITE] Proxy cache TTL (default 1s).
+gp stack nginx proxy -site-cache-valid 300 example.com
+```
+
+The three forms are not interchangeable: each writes only its own directive, so
+the `redis` form on a FastCGI site changes nothing that site serves. Confirm the
+recorded `cache-type` first, then `gp ngx -t` and the cache header afterwards.
+Full flag and file table: `gridpane-gp-cli/references/command-reference.md`.
+
 On **OLS**, use the customizer's LSCache toggles, or:
 
 ```bash
@@ -311,7 +337,10 @@ so validate with `gpols test` first.
 ## Gotchas
 
 - **Switching page cache method resets the TTL.** When moving from Redis page
-  cache to FastCGI, set the TTL manually afterwards.
+  cache to FastCGI, set the TTL in the same step
+  (`gp site {site.url} -fastcgi-cache -ttl {seconds}`) or afterwards with
+  `gp stack nginx fastcgi -site-cache-valid {seconds} {site.url}`. Otherwise the
+  site runs on the 1s FastCGI default.
 - **Object cache plugin missing?** Toggle Object Caching off then on in the UI to
   reinstall the Redis Object Cache plugin.
 - **Purge is server-wide without a site URL.** `gp fix cached` hits everything.

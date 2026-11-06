@@ -5,6 +5,10 @@ backup finished, and how to take one local backup on demand. Read this when a
 backup "succeeds" without producing a revision, when the panel's backup buttons
 spin, or when local backups are configured but never run.
 
+It also covers the two mydumper/myloader generations and the dump/load timeout
+files: those decide whether a dump can be loaded at all, and whether a large one
+finishes inside the limit.
+
 For missing revisions after site deletion/recreation, read
 [missing-backups.md](missing-backups.md): historical evidence, storage-specific
 snapshot IDs, alternate buckets and the recovery hand-off boundary.
@@ -21,13 +25,92 @@ see `gridpane-core/references/sources.md`.
   `/opt/gridpane/backups/duplications`. Each site gets its own Duplicacy
   preferences at `/var/www/{site}/.duplicacy`, initialised on demand by
   `gpbup::checkrepoinit`.
-- A backup is a database dump (mydumper, `database-<epoch>` in the site root)
-  plus a `duplicacy backup` revision of `/var/www/{site}`. Revisions carry a tag:
-  `gp-automated` for the scheduled path, `<epoch>-manual` for the manual path.
+- A backup is a database dump (mydumper, `database-<epoch>` in the site root —
+  which generation runs matters, see below) plus a `duplicacy backup` revision of
+  `/var/www/{site}`. Revisions carry a tag: `gp-automated` for the scheduled
+  path, `<epoch>-manual` for the manual path.
 - Each storage has its own toggle in `/var/www/{site}/logs/backups.env`
   (`Local-Backups:ON|OFF`, `Remote-Backups:ON|OFF`). The schedule lives in
   `/var/www/{site}/logs/{site}.env` and, for the cron scheduler,
   `/etc/cron.d/backup-{interval}-{storage}-{site}`.
+
+## The dump tools: two mydumper generations
+
+Backups, clones and staging all dump with mydumper and load with myloader, and
+two generations coexist on every current server:
+
+| Generation | Version | Location | On `PATH` |
+|---|---|---|---|
+| 0 (baseline) | 0.14.5-2 | `/usr/bin/mydumper`, `/usr/bin/myloader` (dpkg) | yes |
+| 1 (current) | 1.0.3 | `/usr/local/bin/mydumper-1.0.3/bin`, staged from `/opt/gridpane/mydumper/1.0.3` | no, deliberately |
+
+Generation 1 is kept off `PATH` so that a bare `mydumper` still resolves to
+generation 0: an unconverted call site keeps its old behaviour instead of
+silently writing a 1.0.3 dump that older readers classify as baseline.
+
+**The generations cannot load each other's output.** Measured on a
+Ubuntu 26.04 / MariaDB 11.8 server:
+
+| Dump made by | Loaded by | Result |
+|---|---|---|
+| 1.0.3 | 0.14.5 | `rc=139` SEGFAULT, 0 tables, no output at all |
+| 0.14.5 | 1.0.3 | `rc=134`, `Section [config] was not found on metadata file` |
+
+The dangerous direction is new → old, because a segfault writes no `CRITICAL`
+line for the import parsers to catch: the restore looks like it did nothing
+rather than like it failed.
+
+Generation 1 writes `.gp-dump-version` inside the dump directory. That dotfile is
+the only reliable generation marker, because 1.0.3 still prints `# Started dump
+at`, which the restore path's metadata shim reads as a baseline dump. It lives
+inside the dump directory on purpose: `dir/*` skips dotfiles, so it cannot leak
+into the wp-cli fallback paths, and duplicacy's `database-*` include patterns
+carry it into the revision.
+
+Generation 1 also takes different flags, and they follow the binary rather than
+the OS: `--lock-all-tables` for 0.14.5, `--sync-thread-lock-mode=LOCK_ALL` plus
+`--clear` for 1.0.3. `--trx-tables=0` is generation 1 only and is passed when the
+schema holds a non-transactional table, because 1.0.3 otherwise assumes an
+all-InnoDB schema and aborts on the first MyISAM or MEMORY table. Ordinary
+WordPress sites carry those (Action Scheduler, Gravity Forms, Wordfence's
+`wfls_role_counts`, `wp_links`).
+
+## Long dumps and loads: the timeout files
+
+Every dump and load runs under `timeout`, defaulting to **10800 seconds (3
+hours)**. A large database can exceed that, and the run then fails at the limit
+rather than because anything is wrong with the site.
+
+| File | Read on | Applies to | Default |
+|---|---|---|---|
+| `/root/mydumper.timeout` | source server | backups, clone and staging exports | 10800 |
+| `/root/myloader.timeout` | destination server | restores, clone and staging imports | 10800 |
+
+Each file holds one integer number of seconds. A missing or non-numeric file
+falls back to the default, so a malformed file silently keeps 3 hours.
+
+```bash
+# [WRITE] Raise the dump limit to 6 hours on this server.
+# Effect: dumps may run up to 21600s; nothing else changes.
+# Blast radius: this server's own dump runs (backups and clone exports).
+# Backup: note the previous value; there is no file to copy when it is absent.
+# Rollback: rm /root/mydumper.timeout (back to the 10800 default).
+# Confirm before running.
+echo 21600 > /root/mydumper.timeout
+```
+
+```bash
+# [WRITE] Raise the load limit to 6 hours on the destination server.
+# Effect: restores and clone imports may run up to 21600s.
+# Blast radius: this server's own load runs.
+# Backup: note the previous value; there is no file to copy when it is absent.
+# Rollback: rm /root/myloader.timeout (back to the 10800 default).
+# Confirm before running.
+echo 21600 > /root/myloader.timeout
+```
+
+Set them on the right side of the transfer: a slow backup is a source problem, a
+slow restore or clone import is a destination problem.
 
 ## Entry points
 
@@ -259,7 +342,7 @@ state and the app can recreate it the next time a local schedule is saved.
 | `/var/www/{site}/logs/backups.env` | `Local-Backups` / `Remote-Backups` toggles |
 | `/var/www/{site}/logs/{site}.env` | Backup and prune schedule settings |
 
-Last verified: 2026-11-04 against the `tmp/gpcli` snapshot
-(`usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh`), a maintainer-supplied run on
-a GridPane server, and the 2026-11-04 backup queue capture
-(`gridpane-core/references/sources.md`).
+Last verified: 2026-11-05 against the `tmp/gpcli` snapshot
+(`usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh`, `lib/clone.sh`,
+`lib/gridpane.sh`), a maintainer-supplied run on a GridPane server, and the
+2026-11-04 backup queue capture (`gridpane-core/references/sources.md`).

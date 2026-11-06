@@ -1,7 +1,7 @@
 # MySQL / MariaDB on GridPane
 
-Processlist and locks, the slow query log, connection and buffer checks, and
-finding the heavy database.
+Engine and version checks, processlist and locks, the slow query log, connection
+and buffer checks, and finding the heavy database.
 
 ## Log in
 
@@ -14,6 +14,47 @@ gp mysql login root
 # [READ] Print the MySQL root password (for a remote client). Do not paste the
 # output into a transcript or commit it anywhere.
 gp mysql get-pass root
+```
+
+## Which engine and version?
+
+The engine decides which column types and collations exist, so settle it before
+reading a schema or promising a migration.
+
+```sql
+-- [READ] Engine, version and the server default collation.
+SELECT VERSION(), @@version_comment, @@collation_server;
+```
+
+```bash
+# [READ] The client banner, without logging in. The format changed between
+# MariaDB releases, so do not match a fixed string:
+#   10.11: "mysql  Ver 15.1 Distrib 10.11.18-MariaDB, ..."  (Ver is the CLIENT version)
+#   11.8:  "mysql from 11.8.8-MariaDB, client 15.2 ..."     (version follows "from")
+mysql --version
+```
+
+What the version gates:
+
+| Need | Present on |
+|---|---|
+| `utf8mb4_uca1400_*` collations | MariaDB 11.x; not Percona |
+| `utf8mb4_0900_*` collations | MySQL and Percona 8.x; not MariaDB 10.11 |
+| `VECTOR` column type and vector indexes | MariaDB 11.7 and newer — see **Unverified** below |
+
+A restore or clone refuses when the destination engine cannot represent what the
+source uses, instead of importing part of a database; see
+`gridpane-incident-triage`.
+
+### Does a database use a vector column?
+
+Cheap and safe on any engine: it returns no rows when nothing matches.
+
+```sql
+-- [READ] Columns using a type beyond the usual scalars, per schema.
+SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE
+FROM information_schema.COLUMNS
+WHERE DATA_TYPE = 'vector';
 ```
 
 ## Processlist and table locking
@@ -139,7 +180,21 @@ swap heavily while MySQL holds a large buffer pool is over-committed.
   server path above.
 - The engine is Percona on the captured stack; the scripts also detect MariaDB
   (`lib/services.sh`), and reference `mysql.service`. Confirm on a MariaDB box
-  before quoting unit names.
+  before quoting unit names. The version matrix per OS stack is in
+  `gridpane-core/references/stack-overview.md`.
+- The 10.11 banner's `Ver 15.1` is the **client protocol** version, not the
+  server. Reading it as the server version is the classic misread on MariaDB.
+
+## Unverified
+
+- **MariaDB vector search.** GridPane staff describe MariaDB 11.8 (Ubuntu 26.04
+  servers) as supporting `VECTOR` columns and vector indexes, with these restore
+  behaviours: a database containing a vector index restores one thread per table
+  because parallelised myloader deadlocks, the index is rebuilt rather than
+  copied, the vector index cache defaults to 16 MB, and embeddings cost about
+  6 KB per row at 1,536 dimensions. The 2026-10-14 `gpcli` snapshot contains no
+  `VECTOR` handling, so none of this is confirmed in code and none of it is
+  guidance yet. See `OPEN-QUESTIONS.md`.
 
 ## Sources
 
@@ -147,5 +202,8 @@ swap heavily while MySQL holds a large buffer pool is over-committed.
 - Diagnosing 502 Errors (table locking, RAM guidance) — https://gridpane.com/kb/diagnosing-502-errors/
 - How to Optimize Database Performance with MySQLTuner — https://gridpane.com/kb/how-to-optimize-database-performance-with-mysqltuner/
 - Configure MySQL — https://gridpane.com/kb/configure-mysql/
+- MariaDB 11.7+ vector search support timeline — GridPane community forum, staff
+  replies 2026-09-22 and 2026-09-25 (pasted by the maintainer 2026-11-05; URL not
+  yet recorded, see `OPEN-QUESTIONS.md`)
 
-Last verified: 2026-10-07
+Last verified: 2026-11-05

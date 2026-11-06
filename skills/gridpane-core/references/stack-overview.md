@@ -31,6 +31,30 @@ Notes on the flow:
 - A redirect loop is very often the Cloudflare SSL mode (e.g. Flexible) plus an
   origin redirect. See `gridpane-incident-triage`.
 
+## Database engine and OS stack
+
+The database is chosen per server at build time, not per site, and its version
+follows the OS stack. The server-create API takes `database` as `percona` or
+`mariadb` (`gridpane-api/references/endpoints.md`).
+
+| Engine | Version by stack | Recognised as |
+|---|---|---|
+| MariaDB | 11.8 on Ubuntu 26.04; 10.11 on Ubuntu 22.04 and 24.04 | `mariadb118`, `mariadb` |
+| Percona | 8.4 on current builds, an earlier release otherwise | `percona84`, `percona` |
+
+Two consequences for an agent:
+
+- **A feature on one stack can be absent on another.** Column types, collation
+  families and index types differ between MariaDB 10.11, MariaDB 11.8 and
+  Percona. Check the engine and version before assuming something exists; see
+  `gridpane-server-diagnostics/references/mysql.md`.
+- **Moving a site across engines is one-way.** GridPane's clone and restore paths
+  refuse before touching the destination database when the destination cannot
+  represent the source's data, and there is no in-place engine upgrade for
+  MariaDB servers on 22.04/24.04: they stay on 10.11. Decide the destination
+  before the first move, because moving back to 10.11 or Percona is refused
+  rather than slow. See `gridpane-incident-triage`.
+
 ## OpenLiteSpeed specifics
 
 - **Service:** `lshttpd` (Monit watches `/tmp/lshttpd/lshttpd.pid` and port 80).
@@ -94,3 +118,10 @@ and run from the webroot; see `gridpane-wordpress`.
   current GridPane Nginx stacks. Confirm on a real server before citing numbers.
 - The exact default LSAPI mode and worker counts on OLS, and the OLS cache
   directory path (LSCache shares one directory across sites). See `ols.md`.
+- The MariaDB 11.8 vector-search behaviour reported by GridPane staff on the
+  community forum (2026-09-25): `VECTOR` columns and vector indexes on 11.8
+  servers, one thread per table when restoring a database that has a vector
+  index, the index rebuilt on every restore rather than copied, a 16 MB default
+  vector index cache, and a `Clone Refused - DB Column Type` notification. The
+  2026-10-14 `gpcli` snapshot contains no `VECTOR` handling at all, so none of it
+  is confirmed in code. Recorded in `OPEN-QUESTIONS.md`.

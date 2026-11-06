@@ -135,6 +135,7 @@ Every [WRITE] command above includes its rollback. General rules:
 ## Sources
 
 - GP-CLI Quick Reference — https://gridpane.com/kb/gp-cli-quick-reference/
+- Configure Nginx (the `gp stack nginx` flag set) — https://gridpane.com/kb/configure-nginx/
 - GP WP-CLI and Regular WP-CLI — https://gridpane.com/kb/gp-wp-cli/
 - Useful Commands — https://gridpane.com/kb/useful-commands-for-managing-gridpane-servers/
 

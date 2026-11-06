@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## v0.6.0 - 2026-11-06
+
+### Added
+
+- Database engine coverage across the stack: `gridpane-core/references/stack-overview.md`
+  records the engine and version each OS stack runs, and
+  `gridpane-server-diagnostics/references/mysql.md` adds an engine/version check
+  and a read-only `information_schema` probe for vector columns.
+- `gridpane-gp-cli/references/backups.md`: the two mydumper/myloader generations,
+  the `.gp-dump-version` manifest and the `/root/mydumper.timeout` and
+  `/root/myloader.timeout` limits.
+- `gridpane-incident-triage`: routes a refused clone or restore, including the
+  `Clone Refused -- …` and `Restore Issue` notifications.
+- `gridpane-gp-cli/references/command-reference.md`: a `gp stack nginx` section
+  covering the `worker`, `server-name`, `limits`, `open-file-cache`, `fastcgi`,
+  `proxy`, `redis` and `geoip` groups, including the per-site `-site-cache-valid`
+  TTL flags with their directives, files and defaults.
+- `gridpane-wordpress/references/caching.md`: how to change a site's page-cache
+  TTL without re-enabling the cache.
+
+### Fixed
+
+- `.github/workflows/claude-packaging.yml`: the release job now requests
+  `contents: write`, so a `v*` tag run can create the GitHub Release and attach
+  the archives. The workflow-level default stays read-only.
+
 ## v0.5.0 - 2026-11-05
 
 ### Added

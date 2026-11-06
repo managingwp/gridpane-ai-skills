@@ -22,6 +22,7 @@ File targets (see `gridpane-core/references/paths.md`):
 | Block `xmlrpc.php` | `gp site {site.url} -disable-xmlrpc` |
 | Block `wp-content.php` | `gp site {site.url} -block-wp-content.php` |
 | Max request body size | `gp stack nginx limits -site-max-body-size {value} {site.url}` |
+| Page-cache TTL (Redis / FastCGI / proxy) | `gp stack nginx redis\|fastcgi\|proxy -site-cache-valid {seconds} {site.url}` |
 | Custom response headers (security set) | `gp site {site.url} -csp-header-on` for CSP |
 
 Use a snippet only when GridPane has no command for it.

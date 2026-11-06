@@ -205,6 +205,29 @@ job's socket path, that socket's slot count, or what the `tsp -L backup` and
 `tsp -s` processes are. Those are recorded in `OPEN-QUESTIONS.md`; the procedure
 they support is `gridpane-gp-cli/references/backups.md`.
 
+## MariaDB 11.8, dump generations and refused restores (2026-11-05)
+
+Two source classes here. Facts about the deployed scripts are traced to the
+`tmp/gpcli` snapshot captured 2026-10-14. The vector-search facts come from
+GridPane staff answers on the community forum and are **not** in that snapshot,
+so they are recorded as unverified (`OPEN-QUESTIONS.md`) rather than used as
+guidance.
+
+| Fact | Source |
+|---|---|
+| Database is chosen per server as `percona` or `mariadb`; version follows the OS stack | `gridpane-api/references/endpoints.md`; `lib/gridpane.sh:157-190` |
+| Version tokens `percona84`, `percona`, `mariadb118`, `mariadb`, and the 10.11 vs 11.8 banner formats | `lib/gridpane.sh:151-190` |
+| `utf8mb4_0900_*` absent on MariaDB 10.11; `utf8mb4_uca1400_*` absent on Percona | `lib/gridpane.sh:8316-8345` (collation preflight comments and probes) |
+| Two mydumper generations, the `.gp-dump-version` manifest, and the measured mutual-unloadability results (`rc=139`, `rc=134`) | `lib/gridpane.sh:7740-7790` |
+| Per-generation lock flags, `--clear`, and `--trx-tables=0` | `lib/gridpane.sh:9000-9040` |
+| `/root/mydumper.timeout` and `/root/myloader.timeout`, default 10800, non-numeric falls back | `lib/clone.sh:820-833`, `lib/clone.sh:5899-5912`, `lib/gpbup.sh:5297-5310` |
+| Restore refusal before the database drop: `Restore Issue` notification, `return 187`, dump preservation | `lib/restore.sh:5446-5482` |
+| `restore::preserve_db_dump` reason codes (`loader`, `collation`, `dbcheck`, `invalid`, `import`) and its containment checks | `lib/restore.sh:4847-4870` |
+| Clone-side collation preflight (`1` = refuse) and the `/root/allow.collation.mismatch` override | `lib/clone.sh:9533-9562` |
+| `Clone Refused -- …` notification family, exit 187 | `lib/clone.sh:5-21` |
+| MariaDB 10.11 servers on Ubuntu 22.04/24.04 stay on 10.11; MariaDB 11.8 on Ubuntu 26.04 | GridPane community forum, staff reply 2026-09-22 (pasted by the maintainer 2026-11-05; URL not yet recorded) |
+| `VECTOR` type and vector indexes need MariaDB 11.7+; Percona has no vector type; vector restores load one thread per table, rebuild the index, and use a 16 MB default vector index cache | Same thread, staff reply 2026-09-25 — **unverified against code** |
+
 ## Non-GridPane references
 
 | Topic | URL |
