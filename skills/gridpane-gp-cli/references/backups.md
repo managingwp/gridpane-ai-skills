@@ -60,6 +60,18 @@ The dangerous direction is new → old, because a segfault writes no `CRITICAL`
 line for the import parsers to catch: the restore looks like it did nothing
 rather than like it failed.
 
+**26.04 adds a second axis: the database family.** Ubuntu 26.04 servers install
+one mydumper build per family — MySQL/Percona and MariaDB — because each is
+compiled against a different client library, and MariaDB's client libraries and
+`mariadb-*` commands are now separate from MySQL's. A dump from Percona 8.0/8.4
+restores with the MySQL/Percona build; a dump from MariaDB 10.11/11.8 restores
+with the MariaDB build. This is separate from the 0/1 generation above: the
+generation is the mydumper version, the build is the client library it was
+compiled against. Source:
+[Database Versions on Ubuntu 26.04: What Changes and Why](https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why/).
+Dumps are also named per workflow (clone, staging, backup) so a backup only ever
+collects backup dumps.
+
 Generation 1 writes `.gp-dump-version` inside the dump directory. That dotfile is
 the only reliable generation marker, because 1.0.3 still prints `# Started dump
 at`, which the restore path's metadata shim reads as a baseline dump. It lives
@@ -342,7 +354,7 @@ state and the app can recreate it the next time a local schedule is saved.
 | `/var/www/{site}/logs/backups.env` | `Local-Backups` / `Remote-Backups` toggles |
 | `/var/www/{site}/logs/{site}.env` | Backup and prune schedule settings |
 
-Last verified: 2026-11-05 against the `tmp/gpcli` snapshot
+Last verified: 2026-11-06 against the `tmp/gpcli` snapshot
 (`usr/local/bin/gpbup`, `gpbup2`, `lib/gpbup.sh`, `lib/clone.sh`,
 `lib/gridpane.sh`), a maintainer-supplied run on a GridPane server, and the
 2026-11-04 backup queue capture (`gridpane-core/references/sources.md`).

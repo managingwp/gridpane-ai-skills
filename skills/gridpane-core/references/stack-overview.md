@@ -55,6 +55,23 @@ Two consequences for an agent:
   before the first move, because moving back to 10.11 or Percona is refused
   rather than slow. See `gridpane-incident-triage`.
 
+### Ubuntu 26.04 changed the migration rules
+
+26.04 servers run Percona 8.4 or MariaDB 11.8. Percona 8.0 does not run there and
+MariaDB 10.11 is not published for it, so every site arriving on a 26.04 server
+lands on a newer database version than the one it left.
+
+The engines are no longer interchangeable. Each now has default collations the
+other does not fully recognise, so a dump taken from one can fail to load on the
+other — and a cross-engine move (migration, clone, staging push or restore) is
+much more likely to fail on 26.04 than on 22.04 or 24.04. Build the destination
+with the **same database type as the source**: Percona to Percona, MariaDB to
+MariaDB. The same rule covers the dump tools, because 26.04 ships a mydumper build
+per database family (`gridpane-gp-cli/references/backups.md`).
+
+- [Database Versions on Ubuntu 26.04: What Changes and Why](https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why/)
+- [Migrating to Ubuntu 26.04: What You Need to Know](https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know/)
+
 ## OpenLiteSpeed specifics
 
 - **Service:** `lshttpd` (Monit watches `/tmp/lshttpd/lshttpd.pid` and port 80).

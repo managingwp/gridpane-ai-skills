@@ -225,7 +225,9 @@ guidance.
 | `restore::preserve_db_dump` reason codes (`loader`, `collation`, `dbcheck`, `invalid`, `import`) and its containment checks | `lib/restore.sh:4847-4870` |
 | Clone-side collation preflight (`1` = refuse) and the `/root/allow.collation.mismatch` override | `lib/clone.sh:9533-9562` |
 | `Clone Refused -- …` notification family, exit 187 | `lib/clone.sh:5-21` |
-| MariaDB 10.11 servers on Ubuntu 22.04/24.04 stay on 10.11; MariaDB 11.8 on Ubuntu 26.04 | GridPane community forum, staff reply 2026-09-22 (pasted by the maintainer 2026-11-05; URL not yet recorded) |
+| MariaDB 10.11 on Ubuntu 22.04/24.04; MariaDB 11.8 and Percona 8.4 on Ubuntu 26.04 | https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why/ (checked 2026-11-06); originally the community forum, staff reply 2026-09-22 |
+| 26.04 ships one mydumper build per database family; Percona and MariaDB are no longer interchangeable, so keep a move on the same engine | https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why/ (checked 2026-11-06) |
+| Migrating to 26.04: same web stack and same database type, Migrately or Server Clone, extra Redis steps from 18.04/20.04 | https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know/ (checked 2026-11-06) |
 | `VECTOR` type and vector indexes need MariaDB 11.7+; Percona has no vector type; vector restores load one thread per table, rebuild the index, and use a 16 MB default vector index cache | Same thread, staff reply 2026-09-25 — **unverified against code** |
 
 ## Non-GridPane references

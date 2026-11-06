@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Two new KB articles on Ubuntu 26.04 are now cited: the Percona/MariaDB
+  split and the same-engine rule in `gridpane-core/references/stack-overview.md`,
+  and the per-family mydumper builds in `gridpane-gp-cli/references/backups.md`,
+  with both URLs traced in `sources.md`.
+- `gridpane-kb-refresh` records that the diff hash covers the rendered HTML, so
+  image markup changes report as a body change; compare the extracted text
+  before editing a citation.
 - KB manifest refreshed to 389 articles (fetched 2026-11-06): 2 added, 9
   body-changed, 0 removed since 2026-10-21. The two cited articles differ only in
   image markup, so no reference file needed editing.

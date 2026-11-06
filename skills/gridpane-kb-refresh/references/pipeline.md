@@ -78,6 +78,11 @@ A change to `modified` alone is **not** reported: a timestamp edit with identica
 text is not worth re-reading an article for. That is why "the KB moved" and "an
 article changed" are different questions, answered by `check` and `diff`.
 
+`changed` means the `sha256` differs, and that hash is taken over the article's
+rendered HTML. Image attributes, wrapper markup or an editor re-render change the
+hash without changing a word — so `changed` is a candidate, not a verdict. Read
+the body before editing a citation.
+
 ## The counts
 
 | Count | Means |

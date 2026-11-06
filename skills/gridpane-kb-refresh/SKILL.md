@@ -145,6 +145,11 @@ A refresh is correct when all three hold:
 
 - **A `modified` timestamp edit is not a change.** The diff compares content
   hashes, so a page that only re-dated itself produces no rows to act on.
+- **The hash is over the rendered HTML, not the prose.** A page whose images gain
+  `fetchpriority` or new `width`/`height` attributes reports as `changed` while its
+  words are identical. Compare the visible text before editing a citation; the
+  extracted Markdown from the old and new snapshots is the cheap way to do it.
+  `extract --slug SLUG --snapshot OLD` reads an older snapshot.
 - **A title-only change has an identical body.** The citation's wording or link
   text may need updating; the prose the skill relies on did not change.
 - **`refresh` is deliberately slow.** It waits ten seconds between requests; a
