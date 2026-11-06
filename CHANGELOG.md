@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- `scripts/gridpane-kb-docs.sh affected`: joins a snapshot diff to the KB URLs
+  the skills cite and prints `status`, `url` and `file:line` per citation, so a
+  KB refresh names the files to edit instead of a manual grep. Read-only,
+  offline; `--all`, `--skills DIR` and `--json`.
+- `tests/scripts/test_kb_docs.sh`: 12 offline cases over fixture snapshots and a
+  fixture skills tree, including the proof that `affected` writes nothing.
+
+### Changed
+
+- `gridpane-tooling`: the description now covers scraping and refreshing the
+  Knowledge Base, the body gains a `## Refreshing the Knowledge Base` section,
+  and `references/docs.md` carries the refresh-and-update loop end to end.
+  `AGENTS.md` §"Refreshing KB facts" routes to that section instead of repeating
+  it.
+- `refresh` is labelled `[WRITE]` in `gridpane-tooling` and `AGENTS.md`: it
+  republishes the tracked `references/docs-manifest.json`. The label was `[READ]`
+  in both places.
+
 ## v0.6.0 - 2026-11-06
 
 ### Added
