@@ -131,3 +131,8 @@ appear with `"file": null, "line": null` and a `-` in the plain output.
 The scan covers `skills/**/*.md`, which is the whole citation set: `README.md` and
 `AGENTS.md` link the KB home rather than an article, and `CHANGELOG.md` links no
 KB page at all.
+
+`affected` can only speak about articles in two snapshots. A citation that rotted
+before the oldest snapshot — a renamed URL, a slug the manifest no longer lists —
+is invisible here; `gridpane-citation-audit` checks the citation graph itself and
+is the command for that question.

@@ -22,6 +22,7 @@ These skills teach an AI agent (Claude Code, Codex, GitHub Copilot, OpenCode or 
 | `gridpane-api` | Fleet-wide inventory and actions through the GridPane REST API | Read / Write |
 | `gridpane-tooling` | Building, deploying or debugging custom tooling on a GridPane server: the `/usr/local/bin` + `lib/` scripts, the `gp` dispatcher, config/log locations, monit hooks and the docs manifest | Read |
 | `gridpane-kb-refresh` | Refreshing the GridPane Knowledge Base and the skills that cite it: drift check, snapshot, the files a changed article affects, and the gate | Read → Write |
+| `gridpane-citation-audit` | Auditing the skills' KB citations: dead or renamed links, new articles nothing cites, and facts that changed after a file was last verified | Read |
 
 **Mode** describes what the skill may do by default. *Read* skills only inspect. *Write* skills propose changes and run them only after explicit confirmation (see [Safety model](#safety-model)).
 
@@ -67,7 +68,7 @@ npx skills list
 
 ### claude.ai (chat)
 
-There are two routes. Both install the same ten skills, and neither gives the chat sandbox SSH access to your server.
+There are two routes. Both install the same eleven skills, and neither gives the chat sandbox SSH access to your server.
 
 #### Plugin marketplace
 
@@ -138,7 +139,7 @@ Repository tooling, run from a clone:
 | `scripts/build-zips.sh` | Build `dist/<skill>.zip` for each skill and `dist/gridpane-skills-all.zip`. Standalone archives bundle the core and sibling references they cite; output is deterministic and size-checked |
 | `scripts/git-squash-release.sh` | Vendored release helper. A release assigns the version from the last tag to `VERSION`, both Claude manifests and `CHANGELOG.md`, then squashes commits and tags |
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
-| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
+| `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `audit` checks the citations themselves (unknown, uncited-new, stale, coverage, and `--probe` for moved/down); `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
 
 Shipped with the skills and used by them:
 
@@ -224,6 +225,8 @@ gridpane-ai-skills/
 │   │   └── scripts/        # scrape-docs.sh, scrape-changelog.sh
 │   ├── gridpane-kb-refresh/
 │   │   └── references/     # pipeline.md
+│   ├── gridpane-citation-audit/
+│   │   └── references/     # checks.md
 │   └── gridpane-api/
 │       ├── references/     # endpoints.md
 │       └── scripts/        # gp-api.sh, gp-inventory.sh

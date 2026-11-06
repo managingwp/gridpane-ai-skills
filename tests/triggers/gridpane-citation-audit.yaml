@@ -1,0 +1,18 @@
+# Trigger evaluation for gridpane-citation-audit.
+# Prompts that should select this skill, and prompts that should not
+# (they belong to a sibling skill). See AGENTS.md and the plan's testing phase.
+
+should_trigger:
+  - "audit our KB citations and tell me which ones are unsound"
+  - "are there any dead links in the skills' GridPane references"
+  - "which new KB articles are not cited by any skill"
+  - "this KB link redirects somewhere else, find every one of them"
+  - "is our sourcing stale compared to the articles we cite"
+  - "check the citation graph before we release"
+
+should_not_trigger:
+  - "scrape the gridpane knowledge base and update the skills"
+  - "refresh the KB index and rebuild the docs manifest"
+  - "the gridpane docs moved, which skill files do I need to update"
+  - "what gp command clears the fastcgi cache for a site"
+  - "example.com on gridpane is returning 502 right now"

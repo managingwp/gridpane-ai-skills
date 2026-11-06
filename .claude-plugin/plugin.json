@@ -21,6 +21,7 @@
   ],
   "skills": [
     "./skills/gridpane-api",
+    "./skills/gridpane-citation-audit",
     "./skills/gridpane-core",
     "./skills/gridpane-gp-cli",
     "./skills/gridpane-incident-triage",

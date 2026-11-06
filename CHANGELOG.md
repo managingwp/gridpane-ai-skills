@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `gridpane-citation-audit`: the citation soundness check as its own skill —
+  dead or renamed links, cited slugs the manifest does not list, new articles
+  nothing cites, and articles modified after the file that cites them — with
+  `references/checks.md` carrying the four checks, the probe cost model, exit
+  codes and the JSON shape. Trigger boundary with `gridpane-kb-refresh` is drawn
+  on verbs: refresh owns scrape/index/diff, the audit owns audit/dead/uncited/stale.
+- `scripts/gridpane-kb-docs.sh audit`: four offline checks over the committed
+  manifest and `skills/**/*.md` (`unknown`, `uncited-new`, `stale`, `coverage`),
+  `--probe` for redirects and 404s on the unknown URLs only (one request each,
+  ten seconds apart), `--probe-file` for offline fixtures, `--ignore URL` for a
+  deliberate exception, and `--json`. Fenced code blocks are skipped.
 - `gridpane-kb-refresh`: the Knowledge Base refresh loop as its own skill — drift
   check, dated snapshot, `affected` to name the files a changed article touches,
   the edit, and the gate — with `references/pipeline.md` carrying the command
@@ -17,11 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the skills cite and prints `status`, `url` and `file:line` per citation, so a
   KB refresh names the files to edit instead of a manual grep. Read-only,
   offline; `--all`, `--skills DIR` and `--json`.
-- `tests/scripts/test_kb_docs.sh`: 12 offline cases over fixture snapshots and a
-  fixture skills tree, including the proof that `affected` writes nothing.
+- `tests/scripts/test_kb_docs.sh`: 20 offline cases over fixture snapshots and a
+  fixture skills tree, including the proof that `affected` and `audit` write
+  nothing, that a fenced example is not a citation, and that `--probe-file`
+  reports a redirect and a 404 without a network request.
 
 ### Changed
 
+- Four KB citations re-pointed at their current URLs after the KB renamed the
+  articles: the Cloudflare guide, the 6G WAF guide and the two Nginx page-caching
+  guides, in ten references across six files, with the rename recorded in
+  `sources.md` and a new 6G WAF row traced there.
 - Two new KB articles on Ubuntu 26.04 are now cited: the Percona/MariaDB
   split and the same-engine rule in `gridpane-core/references/stack-overview.md`,
   and the per-family mydumper builds in `gridpane-gp-cli/references/backups.md`,

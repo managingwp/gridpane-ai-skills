@@ -22,6 +22,12 @@ matching server skill are the right entry point.
 `references/pipeline.md` holds the command table, exit codes, snapshot layout and
 the exact change set, which is everything the steps below rely on.
 
+The checks this loop cannot make — a citation that redirects, a slug the manifest
+no longer lists, a new article nothing cites, an article edited after the file
+that cites it — belong to `gridpane-citation-audit`, which reads the citation
+graph instead of a snapshot diff. Use it when the question is whether the
+citations are sound rather than what a refresh changed.
+
 ## Prerequisites
 
 - A checkout of `gridpane-ai-skills`; run every command from its root.
