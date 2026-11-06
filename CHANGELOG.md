@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scripts/gridpane-kb-weekly.sh`: a report-only weekly KB check — isolated cache, a
+  comparison against the baseline the last delivered report acknowledged, a plain-text
+  review report (cited `file:line`, uncited articles, the body-hash caveat), and delivery
+  through the configured `send-email` transport. No recipient option, no tracked-file
+  writes, no automatic skill edits.
+- `scripts/install-kb-weekly-timer.sh` with `templates/systemd/*.in`: install the check as
+  a systemd user timer (Monday 08:00 UTC by default, `Persistent=true`), rendering the
+  checkout path at install time so the tracked units carry nothing machine-specific.
+- `scripts/gridpane-kb-docs.sh affected --prev-manifest FILE`: compare the newest snapshot
+  with a stored baseline manifest instead of an earlier snapshot.
 - `gridpane-citation-audit`: the citation soundness check as its own skill —
   dead or renamed links, cited slugs the manifest does not list, new articles
   nothing cites, and articles modified after the file that cites them — with

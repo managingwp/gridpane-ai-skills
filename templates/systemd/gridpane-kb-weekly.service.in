@@ -1,0 +1,18 @@
+[Unit]
+Description=GridPane Knowledge Base weekly report
+Documentation=https://github.com/managingwp/gridpane-ai-skills
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@REPO_ROOT@
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=GRIDPANE_KB_WEEKLY_EMAIL_SCRIPT=%h/.config/opencode/skills/send-email/send-email.sh
+EnvironmentFile=-%h/.config/gridpane-kb-weekly/env
+ExecStart="@REPO_ROOT@/scripts/gridpane-kb-weekly.sh"
+TimeoutStartSec=20min
+CPUQuota=100%
+MemoryMax=512M
+UMask=0077
+Nice=10

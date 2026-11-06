@@ -124,6 +124,7 @@ scripts/gridpane-kb-docs.sh affected
 - The wrapper runs `scrape-docs.sh` with its defaults: **10 seconds between live requests**, a count guard against the previous snapshot, and a hard failure when the manifest disagrees with the API's `X-WP-Total`. It copies the new manifest to `skills/gridpane-tooling/references/docs-manifest.json` only when the content actually changed.
 - Snapshots and page text live in the gitignored `out/gridpane-docs-cache/<YYYY-MM-DD>/`; the manifest is the only artifact that reaches git. See `skills/gridpane-tooling/references/docs.md`.
 - `affected` names the reference files to edit; do not grep for KB URLs by hand. Never re-verify a page the diff did not report, and never paste KB prose into `skills/` — the licence question is still open. `list --filter TEXT` and `search QUERY` find the article behind a change; `diff` and `prune` compare and trim snapshots.
+- `scripts/gridpane-kb-weekly.sh` is the unattended half: it indexes into `out/gridpane-kb-weekly/`, compares with the baseline it last delivered, and emails the review candidates. It is report-only — no edit, commit, push, release or manifest publish. Its units are rendered by `scripts/install-kb-weekly-timer.sh`, and the tracked templates carry no address, path or hostname; keep it that way. See `README.md` §"Weekly KB report".
 
 ## Writing style
 

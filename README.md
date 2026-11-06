@@ -140,6 +140,8 @@ Repository tooling, run from a clone:
 | `scripts/git-squash-release.sh` | Vendored release helper. A release assigns the version from the last tag to `VERSION`, both Claude manifests and `CHANGELOG.md`, then squashes commits and tags |
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
 | `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `audit` checks the citations themselves (unknown, uncited-new, stale, coverage, and `--probe` for moved/down); `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
+| `scripts/gridpane-kb-weekly.sh` | The unattended half of that loop: index the KB into an isolated cache, compare it with the baseline the last delivered report acknowledged, and email the articles that need review. Report-only; writes nothing tracked |
+| `scripts/install-kb-weekly-timer.sh` | Install or remove the weekly check as a systemd user timer (`--calendar`, `--unit-dir`, `--dry-run`, `--uninstall`) |
 
 Shipped with the skills and used by them:
 
@@ -152,6 +154,31 @@ Shipped with the skills and used by them:
 | `scrape-changelog.sh` | `gridpane-tooling` | Changelog digest from Upvoty's public JSON API |
 
 Every script takes `--help`. `tests/scripts/*.sh` are the offline test suites; they are not part of an install and touch no network (the KB and snapshot cases run against a loopback fixture server).
+
+### Weekly KB report
+
+`scripts/gridpane-kb-weekly.sh` is the unattended half of the refresh loop. It indexes the KB into its own cache under the gitignored `out/gridpane-kb-weekly/`, compares the result with the baseline the last delivered report acknowledged, and emails the articles a person should read: the `file:line` that cites each one, the articles nothing cites, and the caveat that a body-hash change may be markup only. It edits nothing, commits nothing and never touches `skills/gridpane-tooling/references/docs-manifest.json`, so a scheduled run and a manual refresh cannot race. No article changed means no email; a scrape or delivery failure always sends one.
+
+Mail goes through the configured `send-email` transport, which owns the recipient. The script has no address option, so a scheduled run cannot mail anywhere else:
+
+```bash
+# [READ] Decide without network, lock, writes or mail.
+scripts/gridpane-kb-weekly.sh --dry-run --json
+
+# [WRITE] One live run; writes only under out/gridpane-kb-weekly/.
+scripts/gridpane-kb-weekly.sh
+
+# [READ] Show the rendered units without installing anything.
+scripts/install-kb-weekly-timer.sh --dry-run
+```
+
+```bash
+# [WRITE] Install the user units, then enable the timer yourself.
+scripts/install-kb-weekly-timer.sh
+systemctl --user enable --now gridpane-kb-weekly.timer
+```
+
+The timer runs Mondays at 08:00 UTC by default (`--calendar` changes it) with `Persistent=true`, so a run missed while the machine was off happens at the next start. Results go to the journal; `state/last-run.json` and `state/last-report.txt` hold the last outcome and the last report. A failed send leaves the baseline in place, so the next run recomputes those changes instead of losing them. Stop it with `systemctl --user disable --now gridpane-kb-weekly.timer`; `scripts/install-kb-weekly-timer.sh --uninstall` removes the units. Settings can be overridden per machine in `~/.config/gridpane-kb-weekly/env`, which the service reads when it exists.
 
 ---
 
@@ -202,7 +229,8 @@ gridpane-ai-skills/
 │   ├── marketplace.json    # claude.ai / Claude Code marketplace entry
 │   └── plugin.json         # exposes every skills/gridpane-* skill
 ├── templates/
-│   └── skill/              # copyable skeleton, outside the discovery root
+│   ├── skill/              # copyable skeleton, outside the discovery root
+│   └── systemd/            # weekly KB report units, rendered at install time
 ├── skills/
 │   ├── gridpane-core/
 │   │   ├── SKILL.md
