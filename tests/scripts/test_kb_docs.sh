@@ -168,6 +168,50 @@ grep -q 'one snapshot only' "$WORK/err-one" \
     || fail "a single snapshot did not explain itself"
 ok "a single snapshot exits non-zero with a PREV hint"
 
+# --- --prev-manifest: a stored baseline instead of an earlier snapshot -------
+
+BASELINE="$WORK/baseline.json"
+cp "$CACHE/2026-01-01/manifest.json" "$BASELINE"
+
+out_baseline="$("$CLI" affected --prev-manifest "$BASELINE" \
+    --cache "$CACHE" --skills "$SKILLS" 2>/dev/null)"
+[[ "$out_baseline" == "$out" ]] \
+    || fail "a baseline manifest produced different rows than the snapshot it copies"
+ok "a baseline manifest reproduces the snapshot comparison byte for byte"
+
+json_baseline="$("$CLI" affected --prev-manifest "$BASELINE" \
+    --cache "$CACHE" --skills "$SKILLS" --json 2>/dev/null)"
+jq -e '.prev == "baseline.json" and .curr == "2026-01-02"' <<<"$json_baseline" >/dev/null \
+    || fail "--prev-manifest JSON names the wrong pair: $(jq -c '{prev,curr}' <<<"$json_baseline")"
+jq -e '.counts == {changed: 4, cited: 3, references: 4, files: 1}' <<<"$json_baseline" \
+    >/dev/null || fail "--prev-manifest JSON counts are wrong"
+ok "--prev-manifest labels the baseline in JSON and keeps the counts"
+
+if "$CLI" affected --prev-manifest "$WORK/missing.json" \
+        --cache "$CACHE" --skills "$SKILLS" >/dev/null 2>"$WORK/err-missing"; then
+    fail "a missing baseline manifest exited 0"
+fi
+grep -q 'baseline manifest not found' "$WORK/err-missing" \
+    || fail "a missing baseline manifest did not explain itself"
+ok "a missing baseline manifest exits non-zero"
+
+printf '{"schema":2}\n' > "$WORK/not-a-manifest.json"
+if "$CLI" affected --prev-manifest "$WORK/not-a-manifest.json" \
+        --cache "$CACHE" --skills "$SKILLS" >/dev/null 2>"$WORK/err-shape"; then
+    fail "a malformed baseline manifest exited 0"
+fi
+grep -q 'not a manifest' "$WORK/err-shape" \
+    || fail "a malformed baseline manifest did not explain itself"
+ok "a malformed baseline manifest exits non-zero"
+
+if "$CLI" affected 2026-01-01 --prev-manifest "$BASELINE" \
+        --cache "$CACHE" --skills "$SKILLS" >/dev/null 2>"$WORK/err-both"; then
+    fail "a snapshot argument combined with --prev-manifest exited 0"
+fi
+grep -q 'cannot be combined' "$WORK/err-both" \
+    || fail "the combination error did not explain itself"
+ok "a positional PREV and --prev-manifest are mutually exclusive"
+
 # --- extract from a named snapshot ------------------------------------------
 
 out_extract="$("$CLI" extract --slug a --snapshot 2026-01-01 --cache "$CACHE" 2>&1)"

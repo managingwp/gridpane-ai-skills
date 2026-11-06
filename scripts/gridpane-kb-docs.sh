@@ -64,6 +64,7 @@ KEEP=""
 YES=0
 PROBE=0
 PROBE_FILE=""
+PREV_MANIFEST=""
 ALLOW_FAST=0
 IGNORE=()
 PASSTHRU=()
@@ -102,6 +103,10 @@ Options:
   --all               extract: convert every article in the snapshot;
                       affected: also list changed articles no skill cites
   --skills DIR        affected/audit: scan this tree for citations (default skills/)
+  --prev-manifest FILE
+                      affected: compare the newest snapshot against this manifest
+                      file instead of an earlier snapshot. Mutually exclusive with
+                      a PREV snapshot argument; missing or malformed files exit 1
   --format text|markdown  extract: output format (default markdown)
   --keep N            prune: snapshots to keep, newest first (default 5)
   --yes               prune: actually delete; without it nothing is removed
@@ -151,6 +156,8 @@ while [[ $# -gt 0 ]]; do
         --manifest=*) MANIFEST="${1#--manifest=}"; shift ;;
         --skills)     SKILLS_DIR="${2:?--skills needs a value}"; shift 2 ;;
         --skills=*)   SKILLS_DIR="${1#--skills=}"; shift ;;
+        --prev-manifest) PREV_MANIFEST="${2:?--prev-manifest needs a value}"; shift 2 ;;
+        --prev-manifest=*) PREV_MANIFEST="${1#--prev-manifest=}"; shift ;;
         --probe)      PROBE=1; shift ;;
         --probe-file) PROBE_FILE="${2:?--probe-file needs a value}"; shift 2 ;;
         --probe-file=*) PROBE_FILE="${1#--probe-file=}"; shift ;;
@@ -628,8 +635,13 @@ citation_map() {
 
 # Join the snapshot diff to the citation map: the answer to "which skill files
 # does this KB change actually touch?". Read-only, offline, no writes.
+#
+# The older side is normally an earlier snapshot in the cache. --prev-manifest
+# replaces it with a stored manifest file, so automation can compare the baseline
+# it last acknowledged against a fresh snapshot without keeping a second copy of
+# the diff logic.
 cmd_affected() {
-    local prev="" curr="" changed="" cites="" rows=""
+    local prev="" prev_path="" curr="" changed="" cites="" rows=""
     local changed_count=0 cited=0 references=0 files=0
     local -a names=()
 
@@ -641,18 +653,28 @@ cmd_affected() {
     fi
 
     curr="${names[0]}"
-    if [[ -n "${POSITIONAL[0]:-}" ]]; then
+    if [[ -n "$PREV_MANIFEST" ]]; then
+        [[ -z "${POSITIONAL[0]:-}" ]] \
+            || die "--prev-manifest cannot be combined with a snapshot argument (${POSITIONAL[0]})"
+        [[ -f "$PREV_MANIFEST" ]] || die "baseline manifest not found: $PREV_MANIFEST"
+        jq -e '.entries | type == "array"' "$PREV_MANIFEST" >/dev/null 2>&1 \
+            || die "not a manifest (no entries array): $PREV_MANIFEST"
+        prev="$(basename "$PREV_MANIFEST")"
+        prev_path="$PREV_MANIFEST"
+    elif [[ -n "${POSITIONAL[0]:-}" ]]; then
         prev="${POSITIONAL[0]}"
         [[ -f "$CACHE/$prev/manifest.json" ]] || die "unknown snapshot: $prev"
+        prev_path="$CACHE/$prev/manifest.json"
     else
         [[ ${#names[@]} -ge 2 ]] \
             || die "one snapshot only ($curr); name the earlier one: affected PREV"
         prev="${names[1]}"
+        prev_path="$CACHE/$prev/manifest.json"
     fi
 
     # The same change set `diff` reports: added, changed (body hash), removed,
     # and title-only. A `modified` timestamp edit alone is not a change.
-    changed="$(jq -r -n --slurpfile a "$CACHE/$prev/manifest.json" \
+    changed="$(jq -r -n --slurpfile a "$prev_path" \
         --slurpfile b "$CACHE/$curr/manifest.json" '
         ($a[0].entries | map({key: .url, value: .}) | from_entries) as $am
         | ($b[0].entries | map({key: .url, value: .}) | from_entries) as $bm
