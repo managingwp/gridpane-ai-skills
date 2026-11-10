@@ -200,7 +200,9 @@ scripts/gridpane-kb-history.sh --check
 
 History starts at the earliest retained snapshot (2026-10-21); earlier KB changes
 are described in `CHANGELOG.md`. A body-"change" means the rendered hash moved,
-so read the article before editing a citation.
+so read the article before editing a citation. The ledger is local, so a fresh
+clone keeps the committed file as the record: `--backfill` can only add intervals
+whose snapshots are still cached, and `--check` needs the ledger to speak.
 
 ---
 
