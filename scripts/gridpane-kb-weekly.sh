@@ -75,6 +75,8 @@ Files written, all under --state unless noted:
   baseline-manifest.json   the manifest the last delivered report acknowledged
   last-report.txt          the report as delivered (or the one held back)
   last-run.json            status, counts, snapshot, baseline, mail result
+  history.jsonl            one record per completed comparison, for
+                           scripts/gridpane-kb-history.sh
   run.lock                 held while a run is in progress
 
 Exit status: 0 success, 1 scrape/guard/delivery failure, 2 usage or
@@ -117,6 +119,7 @@ have jq || die "jq is required"
 BASELINE="$STATE/baseline-manifest.json"
 REPORT="$STATE/last-report.txt"
 RUN_LOG="$STATE/last-run.json"
+HISTORY="$STATE/history.jsonl"
 WORK=""
 
 # shellcheck disable=SC2329  # invoked indirectly by the EXIT trap below
@@ -291,6 +294,43 @@ record_run() {
         > "$RUN_LOG"
 }
 
+# --- history -----------------------------------------------------------------
+
+# One JSON line per completed comparison, in the job's own state directory. The
+# ledger stays gitignored: scripts/gridpane-kb-history.sh renders it into the
+# committed KB-CHANGES.md, so a scheduled run still writes nothing tracked.
+record_history() {
+    local result="$1" snap="$2" manifest="$3" affected="$4" date="$5"
+    local baseline_date titles
+    baseline_date="$(manifest_date "$BASELINE")"
+    titles="$(jq -c -n --slurpfile b "$BASELINE" --slurpfile c "$manifest" '
+        (($b[0].entries // []) + ($c[0].entries // []))
+        | map({key: (.url | sub("/$"; "")), value: .title})
+        | from_entries')"
+    jq -c --arg date "$date" --arg snap "$snap" --arg baseline "$baseline_date" \
+        --arg result "$result" --argjson titles "$titles" '
+        .rows as $rows
+        | ( $rows
+            | group_by(.url)
+            | map(.[0] as $row
+                | {status: $row.status,
+                   url: $row.url,
+                   title: ($titles[$row.url] // ""),
+                   citations: ([ .[] | select(.file != null)
+                                 | "\(.file):\(.line)" ] | unique)})
+          ) as $articles
+        | {schema: 1, date: $date, snapshot: $snap, baseline: $baseline,
+           result: $result,
+           counts: {
+               added: ([$articles[] | select(.status == "added")] | length),
+               removed: ([$articles[] | select(.status == "removed")] | length),
+               changed: ([$articles[] | select(.status == "changed")] | length),
+               title_only: ([$articles[] | select(.status == "title")] | length),
+               references: (.counts.references // 0),
+               files: (.counts.files // 0)},
+           articles: $articles}' "$affected" >> "$HISTORY"
+}
+
 advance_baseline() {
     local manifest="$1" tmp
     tmp="$(mktemp "$STATE/.baseline.XXXXXX")"
@@ -375,6 +415,7 @@ changed="$(changed_articles "$affected")"
 refs="$(jq -r '.counts.references' "$affected")"
 
 if [[ "$changed" -eq 0 ]]; then
+    record_history "no-change" "$snap" "$manifest" "$affected" "$date_today"
     advance_baseline "$manifest"
     record_run "no-change" "not-sent" "$snap" "$affected" "$date_today"
     log "no article changes since the baseline; nothing to send"
@@ -395,6 +436,7 @@ mv "$tmp_report" "$REPORT"
 subject="$(subject_for "$changed" "$date_today")"
 
 if [[ "$NO_EMAIL" -eq 1 ]]; then
+    record_history "held" "$snap" "$manifest" "$affected" "$date_today"
     record_run "held" "suppressed" "$snap" "$affected" "$date_today"
     log "$changed article(s) changed; report held at $REPORT (--no-email)"
     if [[ "$JSON_OUT" -eq 1 ]]; then
@@ -407,6 +449,7 @@ if [[ "$NO_EMAIL" -eq 1 ]]; then
 fi
 
 if send_mail "$subject" "$REPORT"; then
+    record_history "sent" "$snap" "$manifest" "$affected" "$date_today"
     advance_baseline "$manifest"
     record_run "sent" "ok" "$snap" "$affected" "$date_today"
     log "sent: $subject ($refs references)"
@@ -422,6 +465,7 @@ if send_mail "$subject" "$REPORT"; then
     exit 0
 fi
 
+record_history "delivery-failed" "$snap" "$manifest" "$affected" "$date_today"
 record_run "delivery-failed" "failed" "$snap" "$affected" "$date_today"
 log "error: the report was built but not delivered; it stays at $REPORT"
 log "error: the baseline was not advanced, so the next run retries these changes"

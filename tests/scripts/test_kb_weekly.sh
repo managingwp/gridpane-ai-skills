@@ -195,6 +195,19 @@ jq -e '.status == "sent" and .email == "ok"' "$STATE/last-run.json" >/dev/null \
     || fail "last-run.json does not record the delivered run"
 ok "a delivered report advances the baseline and records the run"
 
+jq -s -e 'length == 1
+    and .[0].schema == 1
+    and .[0].result == "sent"
+    and .[0].snapshot == "2026-01-02"
+    and .[0].baseline == "2026-01-01"
+    and .[0].counts.added == 1
+    and .[0].counts.changed == 1
+    and ([.[0].articles[] | select((.citations | length) > 0)] | length) == 1
+    and ([.[0].articles[] | select(.title == "Fixture article")] | length) >= 1' \
+    "$STATE/history.jsonl" >/dev/null \
+    || fail "the ledger record is wrong: $(cat "$STATE/history.jsonl")"
+ok "a delivered run appends one history record with articles and citations"
+
 # --- timestamp-only edit ----------------------------------------------------
 
 reset
@@ -263,6 +276,9 @@ cmp -s "$STATE/baseline-manifest.json" "$BASE" \
 jq -e '.status == "delivery-failed"' "$STATE/last-run.json" >/dev/null \
     || fail "a failed send was not recorded as delivery-failed"
 [[ -s "$STATE/last-report.txt" ]] || fail "a failed send kept no report"
+jq -s -e 'length == 1 and .[0].result == "delivery-failed"' \
+    "$STATE/history.jsonl" >/dev/null \
+    || fail "a failed send wrote no failed ledger record"
 ok "a failed send keeps the report and the baseline for the next run"
 
 # --- held report ------------------------------------------------------------
@@ -276,6 +292,9 @@ run_weekly "$CHANGED" --no-email
 cmp -s "$STATE/baseline-manifest.json" "$BASE" \
     || fail "--no-email advanced the baseline"
 [[ -s "$STATE/last-report.txt" ]] || fail "--no-email stored no report"
+jq -s -e 'length == 1 and .[0].result == "held"' \
+    "$STATE/history.jsonl" >/dev/null \
+    || fail "--no-email wrote no held ledger record"
 ok "--no-email stores the report, sends nothing and exits 3"
 
 # --- lock contention --------------------------------------------------------
