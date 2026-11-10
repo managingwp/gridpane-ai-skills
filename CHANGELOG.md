@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `KB-CHANGES.md` plus `scripts/gridpane-kb-history.sh`: the weekly report now
+  appends one record per completed comparison to a gitignored ledger, and this
+  renderer turns it into a committed, human-readable history grouped by year and
+  month — every added, removed, body-changed and title-only article with the
+  `file:line` that cites it. `--backfill` seeds from the retained snapshots,
+  `--check` fails when the committed file is stale, `--json` prints the month
+  aggregate.
 - `scripts/gridpane-kb-weekly.sh`: a report-only weekly KB check — isolated cache, a
   comparison against the baseline the last delivered report acknowledged, a plain-text
   review report (cited `file:line`, uncited articles, the body-hash caveat), and delivery

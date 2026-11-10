@@ -136,3 +136,25 @@ KB page at all.
 before the oldest snapshot — a renamed URL, a slug the manifest no longer lists —
 is invisible here; `gridpane-citation-audit` checks the citation graph itself and
 is the command for that question.
+
+## The history ledger
+
+The weekly report job (`scripts/gridpane-kb-weekly.sh`) appends one JSON record
+per completed comparison to `out/gridpane-kb-weekly/state/history.jsonl` — its
+own gitignored state, so a scheduled run still writes nothing tracked. Each
+record carries the run date, snapshot and baseline, the result (`sent`,
+`no-change`, `held`, `delivery-failed` or `backfilled`), per-status counts, and
+one entry per article with its `file:line` citations.
+
+`scripts/gridpane-kb-history.sh` renders that ledger into `KB-CHANGES.md`,
+grouped by year and month and newest first. Records are deduplicated by
+baseline, so the run that finally delivers an interval replaces an earlier held
+attempt. `--backfill` diffs the retained snapshots and appends any interval the
+ledger lacks; `--check` exits `3` when the committed file no longer matches;
+`--json` prints the month aggregate.
+
+| Command | Network | What it does |
+|---|---|---|
+| `gridpane-kb-history.sh` | no | Render the ledger to `KB-CHANGES.md` |
+| `gridpane-kb-history.sh --backfill` | no | Add missing intervals from the snapshot caches, then render |
+| `gridpane-kb-history.sh --check` | no | Exit `0` current, `3` stale; writes nothing |

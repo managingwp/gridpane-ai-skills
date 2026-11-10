@@ -141,6 +141,7 @@ Repository tooling, run from a clone:
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
 | `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `audit` checks the citations themselves (unknown, uncited-new, stale, coverage, and `--probe` for moved/down); `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
 | `scripts/gridpane-kb-weekly.sh` | The unattended half of that loop: index the KB into an isolated cache, compare it with the baseline the last delivered report acknowledged, and email the articles that need review. Report-only; writes nothing tracked |
+| `scripts/gridpane-kb-history.sh` | Render the weekly job's ledger as `KB-CHANGES.md`: every monitored KB change, newest first, grouped by year and month, with the `file:line` that cites each article. `--backfill` seeds from retained snapshots, `--check` fails when the committed history is stale |
 | `scripts/install-kb-weekly-timer.sh` | Install or remove the weekly check as a systemd user timer (`--calendar`, `--unit-dir`, `--dry-run`, `--uninstall`) |
 
 Shipped with the skills and used by them:
@@ -179,6 +180,27 @@ systemctl --user enable --now gridpane-kb-weekly.timer
 ```
 
 The timer runs Mondays at 08:00 UTC by default (`--calendar` changes it) with `Persistent=true`, so a run missed while the machine was off happens at the next start. Results go to the journal; `state/last-run.json` and `state/last-report.txt` hold the last outcome and the last report. A failed send leaves the baseline in place, so the next run recomputes those changes instead of losing them. Stop it with `systemctl --user disable --now gridpane-kb-weekly.timer`; `scripts/install-kb-weekly-timer.sh --uninstall` removes the units. Settings can be overridden per machine in `~/.config/gridpane-kb-weekly/env`, which the service reads when it exists.
+
+### KB change history
+
+Each weekly run appends one record to the gitignored
+`out/gridpane-kb-weekly/state/history.jsonl`, so the schedule still writes nothing
+tracked. `scripts/gridpane-kb-history.sh` renders that ledger into
+[`KB-CHANGES.md`](KB-CHANGES.md): every added, removed, body-changed and
+title-only article, newest first and grouped by year and month, with the
+`file:line` that cites each one.
+
+```bash
+# [WRITE] Regenerate KB-CHANGES.md and backfill any interval the ledger lacks.
+scripts/gridpane-kb-history.sh --backfill
+
+# [READ] Exit 3 when the committed history no longer matches the ledger.
+scripts/gridpane-kb-history.sh --check
+```
+
+History starts at the earliest retained snapshot (2026-10-21); earlier KB changes
+are described in `CHANGELOG.md`. A body-"change" means the rendered hash moved,
+so read the article before editing a citation.
 
 ---
 
