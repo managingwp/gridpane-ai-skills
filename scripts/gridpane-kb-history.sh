@@ -43,6 +43,7 @@ BASE_SNAP=""
 BASE_MANIFEST=""
 STATE="$ROOT/out/gridpane-kb-weekly/state"
 SCRAPER="$ROOT/skills/gridpane-tooling/scripts/scrape-docs.sh"
+CHANGES_DIR="$ROOT/kb-changes"
 
 usage() {
     cat <<EOF
@@ -58,7 +59,10 @@ Options:
                   (default: out/gridpane-docs-cache and
                   out/gridpane-kb-weekly/cache)
   --out FILE      Markdown file to write (default KB-CHANGES.md)
-  --stdout        Print the Markdown instead of writing a file
+  --changes-dir DIR
+                  Diff tree to write beside it (default kb-changes)
+  --stdout        Print the Markdown instead of writing a file (the diff tree
+                  is not printed)
   --backfill      Append a record per snapshot interval the ledger lacks, then
                   render
   --check         Compare the rendered history with --out and write nothing;
@@ -82,6 +86,9 @@ Options:
 
 Files written, only when rendering:
   --out           the Markdown history (a temporary file is renamed into place)
+  --changes-dir   one diff file per article per interval, plus its README; only
+                  files named <YYYY>/<MM>/<date>-<slug>.md are ever removed, and
+                  only when the ledger no longer produces them
   --ledger        one line per backfilled interval, with --backfill
 
 --emit-diffs writes one file per article the affected JSON reports, at
@@ -111,6 +118,8 @@ while [[ $# -gt 0 ]]; do
         --cache=*)  CACHES+=("${1#--cache=}"); shift ;;
         --out)      OUT_FILE="${2:?--out needs a value}"; shift 2 ;;
         --out=*)    OUT_FILE="${1#--out=}"; shift ;;
+        --changes-dir)   CHANGES_DIR="${2:?--changes-dir needs a value}"; shift 2 ;;
+        --changes-dir=*) CHANGES_DIR="${1#--changes-dir=}"; shift ;;
         --stdout)   TO_STDOUT=1; shift ;;
         --backfill) BACKFILL=1; shift ;;
         --check)    CHECK=1; shift ;;
@@ -155,6 +164,7 @@ fi
 [[ "$LEDGER" = /* ]] || LEDGER="$ROOT/$LEDGER"
 [[ "$OUT_FILE" = /* ]] || OUT_FILE="$ROOT/$OUT_FILE"
 [[ "$STATE" = /* ]] || STATE="$ROOT/$STATE"
+[[ "$CHANGES_DIR" = /* ]] || CHANGES_DIR="$ROOT/$CHANGES_DIR"
 [[ "$AFFECTED" = /* || -z "$AFFECTED" ]] || AFFECTED="$ROOT/$AFFECTED"
 [[ "$BASE_MANIFEST" = /* || -z "$BASE_MANIFEST" ]] || BASE_MANIFEST="$ROOT/$BASE_MANIFEST"
 
@@ -491,7 +501,7 @@ write_article_diff() {
 # Emit the whole interval. Never fails the caller over a single article: a
 # missing body is reported as "unavailable", not as an error.
 emit_diffs() {
-    local affected="$1" day="$2" snap_dir="$3" base_dir="$4"
+    local affected="$1" day="$2" snap_dir="$3" base_dir="$4" out_root="$5"
     local out_dir rows base_day status url cites kind file
     local emitted=0 unavailable=0
     local -a slugs=() kinds=() files=() urls=()
@@ -509,7 +519,7 @@ emit_diffs() {
     base_day="$(snapshot_day "$base_dir")"
     BASE_LABEL=""
     [[ -f "$base_dir/manifest.json" ]] && BASE_LABEL="$(basename "$base_dir")"
-    out_dir="$STATE/diffs/$day"
+    out_dir="$out_root/diffs/$day"
     mkdir -p "$out_dir"
 
     rows="$(jq -r '
@@ -558,6 +568,221 @@ emit_diffs() {
     fi
 }
 
+# --- tree --------------------------------------------------------------------
+
+CHANGES_REL=""
+
+# Where the diff tree sits relative to the Markdown file that links into it.
+changes_rel() {
+    local from
+    from="$(dirname "$OUT_FILE")"
+    if have realpath; then
+        realpath --relative-to="$from" "$CHANGES_DIR" 2>/dev/null \
+            || printf '%s' "$CHANGES_DIR"
+    else
+        printf '%s' "$CHANGES_DIR"
+    fi
+}
+
+# A completed snapshot directory by name, searched across every cache.
+find_snapshot_named() {
+    local name="$1" cache
+    [[ -n "$name" ]] || return 1
+    for cache in "${CACHES[@]}"; do
+        if [[ -f "$cache/$name/manifest.json" ]]; then
+            printf '%s' "$cache/$name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# The newest completed snapshot standing for a date, for a record that predates
+# the baseline_snapshot field.
+find_snapshot_on() {
+    local day="$1" cache dir best=""
+    [[ -n "$day" ]] || return 1
+    for cache in "${CACHES[@]}"; do
+        [[ -d "$cache" ]] || continue
+        for dir in "$cache"/*/; do
+            [[ -f "$dir/manifest.json" ]] || continue
+            [[ "$(snapshot_day "$dir")" == "$day" ]] || continue
+            best="${dir%/}"
+        done
+    done
+    [[ -n "$best" ]] || return 1
+    printf '%s' "$best"
+}
+
+# Regenerate one record's diffs from the snapshots, into OUT_STATE. Used when the
+# live capture is gone (state lost, or an interval backfilled from manifests).
+emit_record_diffs() {
+    local record="$1" out_state="$2"
+    local date snap base_snap base_date snap_dir base_dir affected
+    date="$(jq -r '.date' <<<"$record")"
+    snap="$(jq -r '.snapshot // ""' <<<"$record")"
+    base_snap="$(jq -r '.baseline_snapshot // ""' <<<"$record")"
+    base_date="$(jq -r '.baseline // ""' <<<"$record")"
+    snap_dir="$(find_snapshot_named "$snap")" || return 1
+    base_dir=""
+    if [[ -n "$base_snap" ]]; then
+        base_dir="$(find_snapshot_named "$base_snap")" || base_dir=""
+    fi
+    [[ -n "$base_dir" ]] || base_dir="$(find_snapshot_on "$base_date")" || base_dir=""
+
+    affected="$WORK/affected.$date.json"
+    printf '%s' "$record" | jq '{
+        rows: [ .articles[] as $a
+                | if (($a.citations // []) | length) == 0 then
+                      {status: $a.status, url: $a.url, file: null, line: null}
+                  else
+                      (($a.citations // [])[]
+                       | capture("^(?<f>.*):(?<l>[0-9]+)$")
+                       | {status: $a.status, url: $a.url,
+                          file: .f, line: (.l | tonumber)})
+                  end ]}' >"$affected" || return 1
+
+    emit_diffs "$affected" "$date" "$snap_dir" "$base_dir" "$out_state" \
+        >/dev/null 2>&1
+}
+
+write_changes_readme() {
+    local dest="$1"
+    cat >"$dest" <<'EOF'
+# KB change diffs
+
+One file per article per reporting interval, rendered by
+`scripts/gridpane-kb-history.sh` from the weekly KB report's ledger and the
+snapshots it captured. [`KB-CHANGES.md`](../KB-CHANGES.md) is the index; this
+directory is the evidence behind it.
+
+Layout: `YYYY/MM/YYYY-MM-DD-<slug>.md`, named for the interval's report date and
+the article's WordPress slug.
+
+Each file opens with the title, the change status, the interval, the article URL
+and the `file:line` that cites it, then the body its status calls for:
+
+| Status | Body |
+|---|---|
+| `changed`, text moved | A unified diff of the extracted text, three lines of context, truncated at 64 KB |
+| `changed`, hash only | A note that the extracted text is identical and only the rendered markup moved |
+| `added` | The extracted size and the URL — never the article's text |
+| `removed` | A note that the URL no longer resolves, with its last title |
+| `title-only` | The before and after title |
+
+The diff is over text extracted from the KB's REST feed, not the published
+HTML, so code blocks and tables may reflow. Treat it as a reading aid: open the
+article when a hunk is ambiguous, and never edit a citation from a hunk alone.
+
+Nothing here is written by the scheduled job. Regenerate it from the repository
+root with `scripts/gridpane-kb-history.sh --backfill`.
+EOF
+}
+
+# Render the whole tree into DEST and, beside it, a map from "date|url" to the
+# file this render produced. Backfills from the snapshots whenever the live
+# capture or the record's own file list cannot supply a file.
+render_changes() {
+    local dest="$1" records record date dd url slug file src rel copied=0 tried
+    records="$(records_json)"
+    rm -rf "$dest"
+    mkdir -p "$dest"
+    write_changes_readme "$dest/README.md"
+    : >"$WORK/diffmap.tsv"
+
+    if [[ "$(printf '%s' "$records" | jq 'length')" -gt 0 ]]; then
+        while IFS= read -r record; do
+            date="$(jq -r '.date' <<<"$record")"
+            dd="$(jq -r '.diff_dir // ""' <<<"$record")"
+            tried=0
+            while IFS=$'\t' read -r url slug; do
+                [[ -n "$slug" ]] || continue
+                file="$date-$slug.md"
+                src=""
+                if [[ -n "$dd" && -f "$STATE/$dd/$file" ]]; then
+                    src="$STATE/$dd/$file"
+                fi
+                if [[ -z "$src" && "$tried" -eq 0 ]]; then
+                    emit_record_diffs "$record" "$WORK/backfill" || true
+                    tried=1
+                fi
+                if [[ -z "$src" && -f "$WORK/backfill/diffs/$date/$file" ]]; then
+                    src="$WORK/backfill/diffs/$date/$file"
+                fi
+                [[ -n "$src" ]] || continue
+                rel="${date:0:4}/${date:5:2}/$file"
+                mkdir -p "$dest/${date:0:4}/${date:5:2}"
+                cp "$src" "$dest/$rel"
+                printf '%s|%s\t%s\n' "$date" "$url" "$rel" >>"$WORK/diffmap.tsv"
+                copied=$((copied + 1))
+            done < <(jq -r '
+                .articles[]?
+                | [.url, (.url | sub("/$"; "") | split("/") | last)] | @tsv' <<<"$record")
+        done < <(printf '%s' "$records" | jq -c '.[]')
+    fi
+
+    jq -Rn '[ inputs | split("\t") | {(.[0]): .[1]} ] | add // {}' \
+        <"$WORK/diffmap.tsv" >"$WORK/diffmap.json"
+    log "changes: $copied diff file(s)"
+}
+
+# Make DEST match SRC. Only renderer-owned names are ever removed, and an empty
+# month or year directory goes with them.
+sync_changes() {
+    local src="$1" dest="$2" rel base f d
+    mkdir -p "$dest"
+    while IFS= read -r rel; do
+        mkdir -p "$dest/$(dirname "$rel")"
+        cmp -s "$src/$rel" "$dest/$rel" || cp "$src/$rel" "$dest/$rel"
+    done < <(cd "$src" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+
+    for f in "$dest"/[0-9][0-9][0-9][0-9]/[0-9][0-9]/*.md; do
+        [[ -f "$f" ]] || continue
+        base="${f#"$dest"/}"
+        if [[ ! -f "$src/$base" ]]; then
+            rm -f "$f"
+            log "removed stale ${f#"$ROOT"/}"
+        fi
+    done
+    for d in "$dest"/[0-9][0-9][0-9][0-9]/[0-9][0-9]; do
+        if [[ -d "$d" ]]; then rmdir "$d" 2>/dev/null || true; fi
+    done
+    for d in "$dest"/[0-9][0-9][0-9][0-9]; do
+        if [[ -d "$d" ]]; then rmdir "$d" 2>/dev/null || true; fi
+    done
+    for f in "$dest"/*; do
+        [[ -f "$f" ]] || continue
+        if [[ "$(basename "$f")" != "README.md" ]]; then
+            log "left alone (not renderer-owned): ${f#"$ROOT"/}"
+        fi
+    done
+    return 0
+}
+
+# Compare the rendered tree with what is on disk. Returns 0 when they match.
+check_changes() {
+    local exp="$1" rel base f bad=0
+    while IFS= read -r rel; do
+        if [[ ! -f "$CHANGES_DIR/$rel" ]]; then
+            log "missing: ${CHANGES_DIR#"$ROOT"/}/$rel"
+            bad=1
+        elif ! cmp -s "$exp/$rel" "$CHANGES_DIR/$rel"; then
+            log "stale: ${CHANGES_DIR#"$ROOT"/}/$rel"
+            bad=1
+        fi
+    done < <(cd "$exp" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+
+    for f in "$CHANGES_DIR"/[0-9][0-9][0-9][0-9]/[0-9][0-9]/*.md; do
+        [[ -f "$f" ]] || continue
+        base="${f#"$CHANGES_DIR"/}"
+        if [[ ! -f "$exp/$base" ]]; then
+            log "extra: ${f#"$ROOT"/}"
+            bad=1
+        fi
+    done
+    return "$bad"
+}
+
 # --- render ------------------------------------------------------------------
 
 # Records deduplicated by baseline: the interval the run finally reported wins
@@ -593,7 +818,8 @@ month_labels() {
 }
 
 render_markdown() {
-    local dest="$1" records labels
+    local dest="$1" records labels diffs
+    CHANGES_REL="$(changes_rel)"
     records="$(records_json)"
     if [[ "$(printf '%s' "$records" | jq 'length')" -eq 0 ]]; then
         {
@@ -604,17 +830,24 @@ render_markdown() {
         return 0
     fi
     labels="$(month_labels "$records")"
-    printf '%s' "$records" | jq -r --argjson labels "$labels" '
+    diffs="$(cat "$WORK/diffmap.json")"
+    printf '%s' "$records" | jq -r --argjson labels "$labels" --arg prefix "$CHANGES_REL" \
+        --argjson diffs "$diffs" '
         def status_label: if . == "title" then "title-only" else . end;
         def status_rank: {"added": 0, "removed": 1, "changed": 2, "title": 3}[.] // 9;
-        def bullet($backfilled):
+        def bullet($backfilled; $date; $prefix):
             "- \(.status | status_label) — [\(if .title == "" then .url else .title end)](\(.url))"
+            + ( ($diffs["\($date)|\(.url)"] // "") as $d
+                | if $d != "" then " · [diff](\($prefix)/\($d))"
+                  elif $backfilled then ""
+                  else " · diff unavailable" end )
             + (if $backfilled then ""
                elif (.citations | length) > 0 then
                    " — cited by " + ([.citations[] | "`\(.)`"] | join(", "))
                else " — uncited" end);
-        def block:
-            (.result == "backfilled") as $backfilled
+        def block($prefix):
+            . as $record
+            | (.result == "backfilled") as $backfilled
             | "**\(.date)** · snapshot `\(.snapshot)` · baseline `\(.baseline)` · \(.result)\n"
             + "\(.counts.added // 0) added · \(.counts.removed // 0) removed"
             + " · \(.counts.changed // 0) changed · \(.counts.title_only // 0) title-only\n"
@@ -623,7 +856,7 @@ render_markdown() {
                else "" end)
             + (if (.articles | length) == 0 then "- no article changes"
                else ([.articles[]] | sort_by((.status | status_rank), .title)
-                     | map(bullet($backfilled)) | join("\n")) end);
+                     | map(bullet($backfilled; $record.date; $prefix)) | join("\n")) end);
         . as $all
         | ([$all[].date[0:7]] | unique | sort | reverse) as $months
         | ([$all[].date[0:4]] | unique | sort | reverse) as $years
@@ -652,7 +885,7 @@ render_markdown() {
                | "\n## \($y)\n"
                  + ([ $months[] | select(startswith($y + "-")) | . as $m
                       | "\n### \($labels[$m])\n\n"
-                        + ([ $all[] | select(.date[0:7] == $m) | block ] | join("\n\n"))
+                        + ([ $all[] | select(.date[0:7] == $m) | block($prefix) ] | join("\n\n"))
                     ] | join("\n"))
              ] | join("\n"))
           )
@@ -672,7 +905,7 @@ if [[ $EMIT_DIFFS -eq 1 ]]; then
         [[ "$BASE_SNAP" = /* ]] || BASE_SNAP="$ROOT/$BASE_SNAP"
         [[ -d "$BASE_SNAP" ]] || die "baseline snapshot not found: $BASE_SNAP"
     fi
-    emit_diffs "$AFFECTED" "$DATE" "$SNAP_DIR" "$BASE_SNAP"
+    emit_diffs "$AFFECTED" "$DATE" "$SNAP_DIR" "$BASE_SNAP" "$STATE"
     exit 0
 fi
 
@@ -683,7 +916,6 @@ fi
 [[ -f "$LEDGER" ]] || die "ledger not found: ${LEDGER#"$ROOT"/} (run the weekly report, or --backfill)"
 
 TMP_MD="$WORK/history.md"
-render_markdown "$TMP_MD"
 
 if [[ $JSON_OUT -eq 1 ]]; then
     records_json >"$WORK/records.json"
@@ -703,16 +935,25 @@ if [[ $JSON_OUT -eq 1 ]]; then
     exit 0
 fi
 
+TMP_CHANGES="$WORK/changes"
+render_changes "$TMP_CHANGES"
+render_markdown "$TMP_MD"
+
 if [[ $CHECK -eq 1 ]]; then
+    bad=0
     if [[ ! -f "$OUT_FILE" ]]; then
-        log "stale: ${OUT_FILE#"$ROOT"/} does not exist; run ${SCRIPT_NAME} --backfill"
-        exit 3
+        log "missing: ${OUT_FILE#"$ROOT"/}"
+        bad=1
+    elif ! cmp -s "$TMP_MD" "$OUT_FILE"; then
+        log "stale: ${OUT_FILE#"$ROOT"/}"
+        bad=1
     fi
-    if cmp -s "$TMP_MD" "$OUT_FILE"; then
-        log "current: ${OUT_FILE#"$ROOT"/} matches the ledger"
+    check_changes "$TMP_CHANGES" || bad=1
+    if [[ $bad -eq 0 ]]; then
+        log "current: ${OUT_FILE#"$ROOT"/} and ${CHANGES_DIR#"$ROOT"/}/ match the ledger"
         exit 0
     fi
-    log "stale: ${OUT_FILE#"$ROOT"/} differs from the ledger; run ${SCRIPT_NAME} --backfill"
+    log "stale: run ${SCRIPT_NAME} --backfill"
     exit 3
 fi
 
@@ -723,4 +964,5 @@ fi
 
 mkdir -p "$(dirname "$OUT_FILE")"
 mv "$TMP_MD" "$OUT_FILE"
-log "wrote ${OUT_FILE#"$ROOT"/}"
+sync_changes "$TMP_CHANGES" "$CHANGES_DIR"
+log "wrote ${OUT_FILE#"$ROOT"/} and ${CHANGES_DIR#"$ROOT"/}/"
