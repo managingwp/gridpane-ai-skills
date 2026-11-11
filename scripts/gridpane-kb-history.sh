@@ -35,6 +35,7 @@ CHECK=0
 TO_STDOUT=0
 JSON_OUT=0
 EMIT_DIFFS=0
+BASE_LABEL=""
 AFFECTED=""
 DATE=""
 SNAP_DIR=""
@@ -506,6 +507,8 @@ emit_diffs() {
     fi
 
     base_day="$(snapshot_day "$base_dir")"
+    BASE_LABEL=""
+    [[ -f "$base_dir/manifest.json" ]] && BASE_LABEL="$(basename "$base_dir")"
     out_dir="$STATE/diffs/$day"
     mkdir -p "$out_dir"
 
@@ -535,13 +538,14 @@ emit_diffs() {
     done <<<"$rows"
 
     if [[ $JSON_OUT -eq 1 ]]; then
-        jq -n --arg date "$day" --arg dir "diffs/$day" \
+        jq -n --arg date "$day" --arg dir "diffs/$day" --arg base "$BASE_LABEL" \
             --argjson emitted "$emitted" --argjson unavailable "$unavailable" \
             --argjson urls "$(printf '%s\n' "${urls[@]}" | jq -R . | jq -s .)" \
             --argjson slugs "$(printf '%s\n' "${slugs[@]}" | jq -R . | jq -s .)" \
             --argjson kinds "$(printf '%s\n' "${kinds[@]}" | jq -R . | jq -s .)" \
             --argjson files "$(printf '%s\n' "${files[@]}" | jq -R . | jq -s .)" '
-            {date: $date, dir: $dir, emitted: $emitted, unavailable: $unavailable,
+            {date: $date, dir: $dir, baseline: $base,
+             emitted: $emitted, unavailable: $unavailable,
              articles: [ range(0; ($urls | length)) as $i
                          | {url: $urls[$i], slug: $slugs[$i],
                             kind: $kinds[$i], file: $files[$i]} ]}'

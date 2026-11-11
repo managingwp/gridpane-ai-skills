@@ -12,6 +12,10 @@
 # send-email transport, so a scheduled run cannot address anyone but the mailbox
 # that transport already owns.
 #
+# Diffs: the run also writes one changed-hunk diff per article under
+# state/diffs/<date>/ so the history renderer can commit it later. The ledger
+# keeps hashes, not bodies, so capturing here is what survives a snapshot prune.
+#
 # Isolation: snapshots, the baseline, the last report and the run metadata live
 # under out/gridpane-kb-weekly/, which is gitignored. A scheduled run therefore
 # cannot race a manual refresh or move skills/gridpane-tooling/references/
@@ -77,6 +81,9 @@ Files written, all under --state unless noted:
   last-run.json            status, counts, snapshot, baseline, mail result
   history.jsonl            one record per completed comparison, for
                            scripts/gridpane-kb-history.sh
+  diffs/<date>/            one changed-hunk diff per article, which
+                           scripts/gridpane-kb-history.sh copies into kb-changes/
+                           when a person renders the history
   run.lock                 held while a run is in progress
 
 Exit status: 0 success, 1 scrape/guard/delivery failure, 2 usage or
@@ -120,6 +127,8 @@ BASELINE="$STATE/baseline-manifest.json"
 REPORT="$STATE/last-report.txt"
 RUN_LOG="$STATE/last-run.json"
 HISTORY="$STATE/history.jsonl"
+HISTORY_CLI="$ROOT/scripts/gridpane-kb-history.sh"
+DIFF_JSON=""
 WORK=""
 
 # shellcheck disable=SC2329  # invoked indirectly by the EXIT trap below
@@ -301,14 +310,25 @@ record_run() {
 # committed KB-CHANGES.md, so a scheduled run still writes nothing tracked.
 record_history() {
     local result="$1" snap="$2" manifest="$3" affected="$4" date="$5"
-    local baseline_date titles
+    local baseline_date baseline_snap titles diffs diff_dir
     baseline_date="$(manifest_date "$BASELINE")"
     titles="$(jq -c -n --slurpfile b "$BASELINE" --slurpfile c "$manifest" '
         (($b[0].entries // []) + ($c[0].entries // []))
         | map({key: (.url | sub("/$"; "")), value: .title})
         | from_entries')"
+    if [[ -n "$DIFF_JSON" && -f "$DIFF_JSON" ]]; then
+        baseline_snap="$(jq -r '.baseline // ""' "$DIFF_JSON")"
+        diff_dir="$(jq -r '.dir // ""' "$DIFF_JSON")"
+        diffs="$(jq -c '[.articles[] | {key: .url, value: {file, kind}}] | from_entries' \
+            "$DIFF_JSON")"
+    else
+        baseline_snap=""
+        diff_dir=""
+        diffs='{}'
+    fi
     jq -c --arg date "$date" --arg snap "$snap" --arg baseline "$baseline_date" \
-        --arg result "$result" --argjson titles "$titles" '
+        --arg baseline_snap "$baseline_snap" --arg diff_dir "$diff_dir" \
+        --arg result "$result" --argjson titles "$titles" --argjson diffs "$diffs" '
         .rows as $rows
         | ( $rows
             | group_by(.url)
@@ -317,9 +337,12 @@ record_history() {
                    url: $row.url,
                    title: ($titles[$row.url] // ""),
                    citations: ([ .[] | select(.file != null)
-                                 | "\(.file):\(.line)" ] | unique)})
+                                 | "\(.file | sub("^.*/skills/"; "skills/")):\(.line)" ] | unique),
+                   diff: ($diffs[$row.url].file // ""),
+                   diff_kind: ($diffs[$row.url].kind // "unavailable")})
           ) as $articles
-        | {schema: 1, date: $date, snapshot: $snap, baseline: $baseline,
+        | {schema: 2, date: $date, snapshot: $snap, baseline: $baseline,
+           baseline_snapshot: $baseline_snap, diff_dir: $diff_dir,
            result: $result,
            counts: {
                added: ([$articles[] | select(.status == "added")] | length),
@@ -426,6 +449,19 @@ if [[ "$changed" -eq 0 ]]; then
         printf 'result: no-change (0 articles)\nsnapshot: %s\n' "$snap"
     fi
     exit 0
+fi
+
+# Diffs are captured now, while both bodies exist: the ledger keeps only hashes,
+# so a diff rendered after a prune would be lost. A failure here costs the diffs,
+# never the report.
+DIFF_JSON="$WORK/diffs.json"
+if ! timeout 600 "$HISTORY_CLI" --emit-diffs --json --affected "$affected" \
+        --date "$date_today" --snapshot "$CACHE/$snap" \
+        --baseline-manifest "$BASELINE" --state "$STATE" \
+        >"$DIFF_JSON" 2>"$WORK/diffs.log"; then
+    log "warning: could not extract diffs; the interval is recorded without them"
+    tail -3 "$WORK/diffs.log" >&2 || true
+    DIFF_JSON=""
 fi
 
 tmp_report="$STATE/.report.XXXXXX"

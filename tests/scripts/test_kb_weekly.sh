@@ -196,17 +196,30 @@ jq -e '.status == "sent" and .email == "ok"' "$STATE/last-run.json" >/dev/null \
 ok "a delivered report advances the baseline and records the run"
 
 jq -s -e 'length == 1
-    and .[0].schema == 1
+    and .[0].schema == 2
     and .[0].result == "sent"
     and .[0].snapshot == "2026-01-02"
     and .[0].baseline == "2026-01-01"
+    and .[0].diff_dir == ("diffs/" + .[0].date)
     and .[0].counts.added == 1
     and .[0].counts.changed == 1
     and ([.[0].articles[] | select((.citations | length) > 0)] | length) == 1
-    and ([.[0].articles[] | select(.title == "Fixture article")] | length) >= 1' \
+    and ([.[0].articles[] | select(.title == "Fixture article")] | length) >= 1
+    and (.[0].articles | all(has("diff") and has("diff_kind")))
+    and ([.[0].articles[] | select(.diff_kind == "added" and (.diff | length) > 0)]
+         | length) == 1' \
     "$STATE/history.jsonl" >/dev/null \
     || fail "the ledger record is wrong: $(cat "$STATE/history.jsonl")"
-ok "a delivered run appends one history record with articles and citations"
+ok "a delivered run appends one schema 2 record with articles, citations and diffs"
+
+# The added article is a stub, never its body, and the state stays local.
+diff_day="$(jq -rs '.[0].date' "$STATE/history.jsonl")"
+[[ -d "$STATE/diffs/$diff_day" ]] || fail "the run wrote no diff directory"
+grep -rq '## New article' "$STATE/diffs/$diff_day" \
+    || fail "the added article has no stub"
+grep -rq '<p>' "$STATE/diffs/$diff_day" \
+    && fail "a diff file would carry raw article markup"
+ok "the run writes diff files under state/diffs without article markup"
 
 # --- timestamp-only edit ----------------------------------------------------
 
