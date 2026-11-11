@@ -34,6 +34,14 @@ BACKFILL=0
 CHECK=0
 TO_STDOUT=0
 JSON_OUT=0
+EMIT_DIFFS=0
+AFFECTED=""
+DATE=""
+SNAP_DIR=""
+BASE_SNAP=""
+BASE_MANIFEST=""
+STATE="$ROOT/out/gridpane-kb-weekly/state"
+SCRAPER="$ROOT/skills/gridpane-tooling/scripts/scrape-docs.sh"
 
 usage() {
     cat <<EOF
@@ -55,11 +63,31 @@ Options:
   --check         Compare the rendered history with --out and write nothing;
                   exit 3 when it differs
   --json          Print the month aggregate as JSON instead of Markdown
+  --emit-diffs    Write one changed-hunk diff per article under
+                  --state/diffs/<date>/ and print the list instead of rendering
+  --affected FILE The affected JSON --emit-diffs reads (required with it)
+  --date DATE     The interval date for --emit-diffs (required with it)
+  --snapshot DIR  The snapshot --emit-diffs compares against (required with it)
+  --baseline-manifest FILE
+                  The baseline manifest --emit-diffs resolves to a snapshot by
+                  content across --cache directories
+  --baseline-snapshot DIR
+                  The baseline snapshot directory, instead of resolving one
+  --state DIR     Where --emit-diffs writes (default
+                  out/gridpane-kb-weekly/state)
+  --scraper PATH  Extraction engine for --emit-diffs (default
+                  skills/gridpane-tooling/scripts/scrape-docs.sh)
   -h, --help      Show this help and exit
 
 Files written, only when rendering:
   --out           the Markdown history (a temporary file is renamed into place)
   --ledger        one line per backfilled interval, with --backfill
+
+--emit-diffs writes one file per article the affected JSON reports, at
+<state>/diffs/<date>/<date>-<slug>.md, and never a whole article body: a new
+article is a stub, a removed one is a note, and a title-only change records the
+two titles. It prints "slug<TAB>kind<TAB>file" per article, or one JSON object
+with --json.
 
 Records are deduplicated by baseline: a held or failed delivery leaves the
 baseline in place, so the run that finally reports that interval replaces the
@@ -86,6 +114,21 @@ while [[ $# -gt 0 ]]; do
         --backfill) BACKFILL=1; shift ;;
         --check)    CHECK=1; shift ;;
         --json)     JSON_OUT=1; shift ;;
+        --emit-diffs)       EMIT_DIFFS=1; shift ;;
+        --affected)         AFFECTED="${2:?--affected needs a value}"; shift 2 ;;
+        --affected=*)       AFFECTED="${1#--affected=}"; shift ;;
+        --date)             DATE="${2:?--date needs a value}"; shift 2 ;;
+        --date=*)           DATE="${1#--date=}"; shift ;;
+        --snapshot)         SNAP_DIR="${2:?--snapshot needs a value}"; shift 2 ;;
+        --snapshot=*)       SNAP_DIR="${1#--snapshot=}"; shift ;;
+        --baseline-manifest)   BASE_MANIFEST="${2:?--baseline-manifest needs a value}"; shift 2 ;;
+        --baseline-manifest=*) BASE_MANIFEST="${1#--baseline-manifest=}"; shift ;;
+        --baseline-snapshot)   BASE_SNAP="${2:?--baseline-snapshot needs a value}"; shift 2 ;;
+        --baseline-snapshot=*) BASE_SNAP="${1#--baseline-snapshot=}"; shift ;;
+        --state)            STATE="${2:?--state needs a value}"; shift 2 ;;
+        --state=*)          STATE="${1#--state=}"; shift ;;
+        --scraper)          SCRAPER="${2:?--scraper needs a value}"; shift 2 ;;
+        --scraper=*)        SCRAPER="${1#--scraper=}"; shift ;;
         -h|--help)  usage; exit 0 ;;
         -*) log "error: unknown option: $1"; usage >&2; exit 2 ;;
         *)  log "error: unexpected argument: $1"; usage >&2; exit 2 ;;
@@ -95,12 +138,24 @@ done
 have jq || die "jq is required"
 [[ $BACKFILL -eq 1 && $CHECK -eq 1 ]] \
     && die "--backfill writes the ledger, so it cannot be combined with --check" 2
+if [[ $EMIT_DIFFS -eq 1 ]]; then
+    [[ $BACKFILL -eq 0 && $CHECK -eq 0 ]] \
+        || die "--emit-diffs is its own mode; drop --backfill and --check" 2
+    [[ -n "$AFFECTED" ]] || die "--emit-diffs needs --affected FILE" 2
+    [[ -n "$DATE" ]] || die "--emit-diffs needs --date YYYY-MM-DD" 2
+    [[ -n "$SNAP_DIR" ]] || die "--emit-diffs needs --snapshot DIR" 2
+    [[ -n "$BASE_SNAP" || -n "$BASE_MANIFEST" ]] \
+        || die "--emit-diffs needs --baseline-manifest FILE or --baseline-snapshot DIR" 2
+fi
 
 if [[ ${#CACHES[@]} -eq 0 ]]; then
     CACHES=("$ROOT/out/gridpane-docs-cache" "$ROOT/out/gridpane-kb-weekly/cache")
 fi
 [[ "$LEDGER" = /* ]] || LEDGER="$ROOT/$LEDGER"
 [[ "$OUT_FILE" = /* ]] || OUT_FILE="$ROOT/$OUT_FILE"
+[[ "$STATE" = /* ]] || STATE="$ROOT/$STATE"
+[[ "$AFFECTED" = /* || -z "$AFFECTED" ]] || AFFECTED="$ROOT/$AFFECTED"
+[[ "$BASE_MANIFEST" = /* || -z "$BASE_MANIFEST" ]] || BASE_MANIFEST="$ROOT/$BASE_MANIFEST"
 
 WORK=""
 cleanup() {
@@ -211,6 +266,294 @@ backfill_ledger() {
     log "backfill: $added interval(s) added to ${LEDGER#"$ROOT"/}"
 }
 
+# --- diffs -------------------------------------------------------------------
+
+# A committed diff file stops growing here, at a hunk boundary or, when a single
+# hunk is larger than the budget, at a line boundary. A pathological rewrite
+# would otherwise put hundreds of kilobytes of article text in one file; the
+# article link in the header is the escape hatch.
+DIFF_CAP=65536
+
+# "https://gridpane.com/kb/migrately" -> "migrately"
+slug_of_url() {
+    local url="${1%/}"
+    printf '%s' "${url##*/}"
+}
+
+# The interval a snapshot directory stands for, as YYYY-MM-DD: the manifest's
+# fetch date when it has one, else the directory name with any -N suffix
+# dropped.
+snapshot_day() {
+    local dir="$1" day=""
+    if [[ -f "$dir/manifest.json" ]]; then
+        day="$(jq -r '.fetched_at // ""' "$dir/manifest.json" 2>/dev/null || true)"
+    fi
+    [[ -n "$day" ]] || day="$(basename "$dir")"
+    if [[ "$day" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+        day="${BASH_REMATCH[1]}"
+    fi
+    printf '%s' "$day"
+}
+
+# An article's title from a snapshot manifest; empty when it is not there.
+snapshot_title() {
+    local dir="$1" url="${2%/}"
+    [[ -f "$dir/manifest.json" ]] || { printf ''; return 0; }
+    jq -r --arg u "$url" '
+        [.entries[] | select((.url | sub("/$"; "")) == $u)][0].title // ""' \
+        "$dir/manifest.json" 2>/dev/null || true
+}
+
+# The baseline manifest is a byte copy of the snapshot manifest it came from,
+# so identity is an exact test rather than a date guess.
+resolve_baseline_snapshot() {
+    local want="$1" cache dir
+    for cache in "${CACHES[@]}"; do
+        [[ -d "$cache" ]] || continue
+        for dir in "$cache"/*/; do
+            [[ -f "$dir/manifest.json" ]] || continue
+            if cmp -s "$want" "$dir/manifest.json"; then
+                printf '%s' "${dir%/}"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+# One article's extracted text, through the scraper so the converter is never
+# duplicated. The scraper writes <snapshot>/<slug>.md into the gitignored cache,
+# which is its documented extract behaviour; the copy keeps the snapshot clean
+# enough for the next run to overwrite without reading its own output.
+extract_body() {
+    local dir="$1" slug="$2" dest="$3" abs
+    [[ -d "$dir" ]] || return 1
+    abs="$(cd "$dir" && pwd)"
+    rm -f "$abs/$slug.md"
+    if ! "$SCRAPER" --cache "$(dirname "$abs")" --snapshot "$abs" \
+            --slug "$slug" --format markdown --no-pandoc \
+            >/dev/null 2>>"$WORK/extract.log"; then
+        return 1
+    fi
+    [[ -s "$abs/$slug.md" ]] || return 1
+    cp "$abs/$slug.md" "$dest"
+}
+
+# Header every diff file carries: what moved, where to read it, and who cites it.
+diff_header() {
+    local title="$1" status="$2" base_day="$3" day="$4" url="$5" cites="$6"
+    printf '# %s\n\n' "${title:-$url}"
+    printf -- '- Status: %s\n' "$status"
+    printf -- '- Interval: %s → %s\n' "$base_day" "$day"
+    printf -- '- Article: %s\n' "$url"
+    if [[ -n "$cites" ]]; then
+        printf -- '- Cited by: %s\n' "$cites"
+    else
+        # shellcheck disable=SC2016  # literal Markdown backticks, not a command
+        printf -- '- Cited by: nothing in `skills/`\n'
+    fi
+    printf -- '- Extracted text, not the published HTML: code blocks and tables may reflow.\n\n'
+}
+
+# Truncate a unified diff at DIFF_CAP bytes, at a hunk boundary when one fits and
+# at a line boundary otherwise, and say so. LC_ALL=C keeps length() in bytes.
+cap_diff() {
+    local raw="$1" out="$2"
+    LC_ALL=C awk -v cap="$DIFF_CAP" '
+        BEGIN { total = 0; hunk = ""; stopped = 0 }
+        /^@@/ {
+            if (hunk != "") {
+                if (stopped || total + length(hunk) > cap) {
+                    stopped = 1
+                } else {
+                    printf "%s", hunk
+                    total += length(hunk)
+                }
+                hunk = ""
+            }
+            if (!stopped) { hunk = $0 "\n" }
+            next
+        }
+        {
+            if (hunk == "") {
+                if (!stopped) { print; total += length($0) + 1 }
+                next
+            }
+            if (stopped) next
+            hunk = hunk $0 "\n"
+        }
+        END {
+            if (stopped) {
+                printf "\n… Diff truncated at %d KB; open the article for the rest.\n", cap / 1024
+                exit
+            }
+            if (total + length(hunk) <= cap) { printf "%s", hunk; exit }
+            n = split(hunk, lines, "\n")
+            room = cap - total
+            for (i = 1; i <= n; i++) {
+                if (length(lines[i]) + 1 > room) break
+                print lines[i]
+                room -= length(lines[i]) + 1
+            }
+            printf "\n… Diff truncated at %d KB; open the article for the rest.\n", cap / 1024
+        }' "$raw" >"$out"
+}
+
+# Write one article's file. Returns the diff kind through DIFF_KIND and the
+# file name through DIFF_FILE (empty when no file is worth writing).
+write_article_diff() {
+    local status="$1" url="$2" cites="$3" base_dir="$4" snap_dir="$5"
+    local base_day="$6" day="$7" out_dir="$8"
+    local slug title new_title old_title kind="" file="" size=0
+    slug="$(slug_of_url "$url")"
+    # affected reports file:line against the tree it scanned, which is absolute
+    # when --skills is; a committed file must not carry a workstation path.
+    cites="${cites//$ROOT\//}"
+    title="$(snapshot_title "$snap_dir" "$url")"
+    [[ -n "$title" ]] || title="$(snapshot_title "$base_dir" "$url")"
+    file="$day-$slug.md"
+
+    case "$status" in
+        added)
+            kind="added"
+            if extract_body "$snap_dir" "$slug" "$WORK/new.md"; then
+                size="$(wc -c <"$WORK/new.md" | tr -d ' ')"
+            fi
+            {
+                diff_header "$title" "added" "$base_day" "$day" "$url" "$cites"
+                printf '## New article\n\n'
+                printf 'Added to the KB in this interval, so there is no earlier version to diff. '
+                if [[ "$size" -gt 0 ]]; then
+                    printf 'The extracted text is %s bytes; read it at %s.\n' "$size" "$url"
+                else
+                    printf 'Read it at %s.\n' "$url"
+                fi
+            } >"$out_dir/$file"
+            ;;
+        removed)
+            kind="removed"
+            {
+                diff_header "$title" "removed" "$base_day" "$day" "$url" "$cites"
+                printf '## Removed article\n\n'
+                printf 'The URL no longer appears in the KB index. The last recorded title is "%s".\n' \
+                    "$title"
+            } >"$out_dir/$file"
+            ;;
+        title)
+            kind="title"
+            new_title="$(snapshot_title "$snap_dir" "$url")"
+            old_title="$(snapshot_title "$base_dir" "$url")"
+            {
+                diff_header "$new_title" "title-only" "$base_day" "$day" "$url" "$cites"
+                printf '## Title change\n\n'
+                printf -- '- Before: %s\n' "${old_title:-unknown}"
+                printf -- '- After: %s\n\n' "${new_title:-unknown}"
+                printf 'The body text is unchanged.\n'
+            } >"$out_dir/$file"
+            ;;
+        changed)
+            if ! extract_body "$base_dir" "$slug" "$WORK/old.md" \
+                    || ! extract_body "$snap_dir" "$slug" "$WORK/new.md"; then
+                kind="unavailable"
+                file=""
+            elif cmp -s "$WORK/old.md" "$WORK/new.md"; then
+                kind="markup-only"
+                {
+                    diff_header "$title" "changed" "$base_day" "$day" "$url" "$cites"
+                    printf '## No text change\n\n'
+                    printf 'The extracted text is identical in both snapshots; the rendered-HTML\n'
+                    printf 'hash changed (markup only). Nothing here needs a citation edit.\n'
+                } >"$out_dir/$file"
+            else
+                kind="text"
+                diff -u --label "$base_day" --label "$day" \
+                    "$WORK/old.md" "$WORK/new.md" >"$WORK/diff.raw" || true
+                cap_diff "$WORK/diff.raw" "$WORK/diff.cut"
+                {
+                    diff_header "$title" "changed" "$base_day" "$day" "$url" "$cites"
+                    printf '## Diff\n\n```diff\n'
+                    cat "$WORK/diff.cut"
+                    printf '```\n'
+                } >"$out_dir/$file"
+            fi
+            ;;
+        *)
+            kind="unavailable"
+            file=""
+            ;;
+    esac
+
+    DIFF_KIND="$kind"
+    DIFF_FILE="$file"
+}
+
+# Emit the whole interval. Never fails the caller over a single article: a
+# missing body is reported as "unavailable", not as an error.
+emit_diffs() {
+    local affected="$1" day="$2" snap_dir="$3" base_dir="$4"
+    local out_dir rows base_day status url cites kind file
+    local emitted=0 unavailable=0
+    local -a slugs=() kinds=() files=() urls=()
+
+    [[ -f "$affected" ]] || die "affected JSON not found: $affected"
+    [[ -d "$snap_dir" ]] || die "snapshot not found: $snap_dir"
+    [[ -f "$snap_dir/manifest.json" ]] \
+        || die "snapshot has no manifest.json: $snap_dir"
+    if [[ -z "$base_dir" ]]; then
+        log "no baseline snapshot found; every article is recorded as unavailable"
+        base_dir="$WORK/no-baseline"
+        mkdir -p "$base_dir"
+    fi
+
+    base_day="$(snapshot_day "$base_dir")"
+    out_dir="$STATE/diffs/$day"
+    mkdir -p "$out_dir"
+
+    rows="$(jq -r '
+        [ .rows[] ]
+        | group_by(.url)
+        | map({status: .[0].status, url: .[0].url,
+               cites: ([ .[] | select(.file != null)
+                         | "`\(.file):\(.line)`" ] | unique)})
+        | sort_by(.url)
+        | .[]
+        | [.status, .url, (.cites | join(", "))] | @tsv' "$affected")"
+
+    while IFS=$'\t' read -r status url cites; do
+        [[ -n "$url" ]] || continue
+        write_article_diff "$status" "$url" "$cites" "$base_dir" "$snap_dir" \
+            "$base_day" "$day" "$out_dir"
+        kind="$DIFF_KIND"
+        file="$DIFF_FILE"
+        if [[ "$kind" == "unavailable" ]]; then
+            unavailable=$((unavailable + 1))
+        else
+            emitted=$((emitted + 1))
+        fi
+        urls+=("$url"); slugs+=("$(slug_of_url "$url")")
+        kinds+=("$kind"); files+=("$file")
+    done <<<"$rows"
+
+    if [[ $JSON_OUT -eq 1 ]]; then
+        jq -n --arg date "$day" --arg dir "diffs/$day" \
+            --argjson emitted "$emitted" --argjson unavailable "$unavailable" \
+            --argjson urls "$(printf '%s\n' "${urls[@]}" | jq -R . | jq -s .)" \
+            --argjson slugs "$(printf '%s\n' "${slugs[@]}" | jq -R . | jq -s .)" \
+            --argjson kinds "$(printf '%s\n' "${kinds[@]}" | jq -R . | jq -s .)" \
+            --argjson files "$(printf '%s\n' "${files[@]}" | jq -R . | jq -s .)" '
+            {date: $date, dir: $dir, emitted: $emitted, unavailable: $unavailable,
+             articles: [ range(0; ($urls | length)) as $i
+                         | {url: $urls[$i], slug: $slugs[$i],
+                            kind: $kinds[$i], file: $files[$i]} ]}'
+    else
+        local i
+        for ((i = 0; i < ${#slugs[@]}; i++)); do
+            printf '%s\t%s\t%s\n' "${slugs[$i]}" "${kinds[$i]}" "${files[$i]}"
+        done
+        log "diffs: $emitted file(s), $unavailable unavailable, in ${out_dir#"$ROOT"/}"
+    fi
+}
+
 # --- render ------------------------------------------------------------------
 
 # Records deduplicated by baseline: the interval the run finally reported wins
@@ -313,6 +656,21 @@ render_markdown() {
 }
 
 # --- run ---------------------------------------------------------------------
+
+if [[ $EMIT_DIFFS -eq 1 ]]; then
+    [[ -x "$SCRAPER" || -r "$SCRAPER" ]] \
+        || die "scraper not found: ${SCRAPER#"$ROOT"/} (pass --scraper)"
+    if [[ -z "$BASE_SNAP" ]]; then
+        BASE_SNAP="$(resolve_baseline_snapshot "$BASE_MANIFEST")" || BASE_SNAP=""
+    fi
+    [[ "$SNAP_DIR" = /* ]] || SNAP_DIR="$ROOT/$SNAP_DIR"
+    if [[ -n "$BASE_SNAP" ]]; then
+        [[ "$BASE_SNAP" = /* ]] || BASE_SNAP="$ROOT/$BASE_SNAP"
+        [[ -d "$BASE_SNAP" ]] || die "baseline snapshot not found: $BASE_SNAP"
+    fi
+    emit_diffs "$AFFECTED" "$DATE" "$SNAP_DIR" "$BASE_SNAP"
+    exit 0
+fi
 
 if [[ $BACKFILL -eq 1 ]]; then
     backfill_ledger
