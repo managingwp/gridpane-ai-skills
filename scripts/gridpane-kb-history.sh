@@ -418,8 +418,9 @@ write_article_diff() {
     local slug title new_title old_title kind="" file="" size=0
     slug="$(slug_of_url "$url")"
     # affected reports file:line against the tree it scanned, which is absolute
-    # when --skills is; a committed file must not carry a workstation path.
-    cites="${cites//$ROOT\//}"
+    # when --skills is; a committed file must not carry a workstation path, so
+    # every citation is rewritten to its repository-relative form.
+    cites="$(printf '%s' "$cites" | sed -E 's#[^ `]+/skills/#skills/#g')"
     title="$(snapshot_title "$snap_dir" "$url")"
     [[ -n "$title" ]] || title="$(snapshot_title "$base_dir" "$url")"
     file="$day-$slug.md"
@@ -577,7 +578,8 @@ changes_rel() {
     local from
     from="$(dirname "$OUT_FILE")"
     if have realpath; then
-        realpath --relative-to="$from" "$CHANGES_DIR" 2>/dev/null \
+        # -m: the tree may not exist yet on a first render.
+        realpath -m --relative-to="$from" "$CHANGES_DIR" 2>/dev/null \
             || printf '%s' "$CHANGES_DIR"
     else
         printf '%s' "$CHANGES_DIR"
@@ -795,7 +797,7 @@ records_json() {
             elif .result == "held" then 2
             elif .result == "delivery-failed" then 1
             else 0 end;
-        [ .[] | select(type == "object" and (.schema // 0) == 1
+        [ .[] | select(type == "object" and (.schema // 0) >= 1
                        and (.baseline // "") != "" and (.date // "") != "") ]
         | to_entries
         | map(.value + {__i: .key})
