@@ -114,7 +114,14 @@ converter drops `script`/`style`/`svg`/`noscript` bodies and turns block tags
 into line breaks. Body markup is Elementor output, so the converter alone keeps
 inline CSS out of the text. Output is `<snapshot>/<slug>.md` (for example
 `out/gridpane-docs-cache/2026-10-21/cache-warming-gridpane-sitemap-driven-crawler.md`)
-— never commit it.
+— never commit it as an article body.
+
+The one exception is `kb-changes/`: `scripts/gridpane-kb-history.sh` diffs the
+text of two snapshots and commits only the hunks that moved, one file per
+article per interval. A new article is recorded as a stub with its size, never
+its body. That is the only KB text this repository publishes, and it exists so a
+reader can tell a markup-only change from a real one without opening the
+article.
 
 ### Compare snapshots
 

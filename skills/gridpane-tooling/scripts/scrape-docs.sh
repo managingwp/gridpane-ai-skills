@@ -25,8 +25,11 @@
 # cheap change check.
 #
 # Raw JSON and HTML stay in the (gitignored) cache directory; only the manifest
-# is meant to be committed. No GridPane page text is rehosted: extracted text is
-# written to the cache as <slug>.md and must never be committed.
+# is meant to be committed. Extracted text is written to the cache as <slug>.md
+# and is never committed as an article body. One narrow exception exists: the
+# changed-hunk diffs under kb-changes/, which scripts/gridpane-kb-history.sh
+# derives from two snapshots for a person to review. They quote only the hunks
+# that moved, and a new article is recorded as a stub rather than its text.
 #
 # This script only reads public endpoints. It never touches a GridPane server
 # and never modifies the fetched site.
