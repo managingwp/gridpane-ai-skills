@@ -56,9 +56,10 @@ Diagnose before touching a file. Every command carries a label: **[READ]**,
 5. **Edit only what step 4 named**, then re-stamp that file's `Last verified`.
 6. **Trace and gate.** A new or corrected GridPane fact needs a line in
    `skills/gridpane-core/references/sources.md`. Then run `scripts/lint-skills.sh`.
-7. **Record it.** Regenerate `KB-CHANGES.md` (`scripts/gridpane-kb-history.sh
-   --backfill`) so the history names what moved, add a CHANGELOG entry under
-   `## Unreleased`, and make one conventional commit.
+7. **Record it.** Regenerate `KB-CHANGES.md` and the `kb-changes/` diff tree
+   (`scripts/gridpane-kb-history.sh --backfill`) so the history names what moved
+   and shows the hunks, add a CHANGELOG entry under `## Unreleased`, and make one
+   conventional commit.
 
 An unattended run may do steps 1–4, edit the references they name, and commit. It
 must not push, release, or delete a snapshot, and a change that would alter more

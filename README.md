@@ -141,7 +141,7 @@ Repository tooling, run from a clone:
 | `scripts/lint-skills.sh` | Repository checks: frontmatter, command labels, relative links, absolute package paths, secrets, IPs, domains, and Claude version sync. Run before committing; exits non-zero on a problem |
 | `scripts/gridpane-kb-docs.sh` | Scrape, inspect and manage the KB cache. `status` reports ingested / cached / extracted / drift without a request; `check` is one request (exit 3 when the KB moved); `refresh` indexes a dated snapshot and publishes only where the KB changed; `affected` lists the `file:line` in `skills/` that cites each changed article, which is how a KB refresh drives a skill update; `audit` checks the citations themselves (unknown, uncited-new, stale, coverage, and `--probe` for moved/down); `list`, `search`, `diff`, `extract` and `prune` browse, query, compare, convert and trim |
 | `scripts/gridpane-kb-weekly.sh` | The unattended half of that loop: index the KB into an isolated cache, compare it with the baseline the last delivered report acknowledged, and email the articles that need review. Report-only; writes nothing tracked |
-| `scripts/gridpane-kb-history.sh` | Render the weekly job's ledger as `KB-CHANGES.md`: every monitored KB change, newest first, grouped by year and month, with the `file:line` that cites each article. `--backfill` seeds from retained snapshots, `--check` fails when the committed history is stale |
+| `scripts/gridpane-kb-history.sh` | Render the weekly job's ledger as `KB-CHANGES.md` plus the `kb-changes/` diff tree: every monitored KB change, newest first, grouped by year and month, with the `file:line` that cites each article and a link to the hunks that moved. `--backfill` seeds from retained snapshots, `--emit-diffs` is the half the weekly job calls, `--check` fails when the committed history or tree is stale |
 | `scripts/install-kb-weekly-timer.sh` | Install or remove the weekly check as a systemd user timer (`--calendar`, `--unit-dir`, `--dry-run`, `--uninstall`) |
 
 Shipped with the skills and used by them:
@@ -203,6 +203,26 @@ are described in `CHANGELOG.md`. A body-"change" means the rendered hash moved,
 so read the article before editing a citation. The ledger is local, so a fresh
 clone keeps the committed file as the record: `--backfill` can only add intervals
 whose snapshots are still cached, and `--check` needs the ledger to speak.
+
+#### Diff files
+
+Each bullet links to a file under [`kb-changes/`](kb-changes/README.md), one per
+article per interval, named `YYYY/MM/YYYY-MM-DD-<slug>.md`:
+
+- a **changed** article with different text gets the unified diff of the
+  extracted text, three lines of context, truncated at 64 KB;
+- a **changed** article whose text is identical says so — the hash moved on
+  markup alone, and no citation needs touching;
+- an **added** article is a stub with its size and URL, never its text;
+- a **removed** article is a note; a **title-only** change records both titles.
+
+The weekly job captures the diffs into its own `state/diffs/<date>/` on the run
+that sees them, because the ledger keeps hashes rather than bodies and a later
+`prune` would lose the evidence. The renderer copies them, and can still
+regenerate an interval from snapshots that survive. Only hunks are ever
+committed: full article text stays in the cache. `kb-changes/` sits outside
+`scripts/lint-skills.sh`, which scans `skills/`, so nothing there is checked for
+secrets, addresses or hostnames — keep it to what the renderer wrote.
 
 ---
 

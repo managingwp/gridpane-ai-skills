@@ -36,6 +36,7 @@ command -v jq >/dev/null 2>&1 || fail "jq is required"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+before_status="$(git -C "$REPO_ROOT" status --porcelain)"
 
 LEDGER="$WORK/ledger.jsonl"
 OUT="$WORK/KB-CHANGES.md"
@@ -44,7 +45,10 @@ run_history() {
     local status=0
     HISTORY_OUT=""
     HISTORY_ERR=""
-    if HISTORY_OUT="$("$HISTORY" --ledger "$LEDGER" --out "$OUT" "$@" 2>"$WORK/stderr")"; then
+    # Always render into the work directory: the diff tree defaults to the
+    # repository's own kb-changes/, and a test must not write there.
+    if HISTORY_OUT="$("$HISTORY" --ledger "$LEDGER" --out "$OUT" \
+            --changes-dir "$WORK/changes" "$@" 2>"$WORK/stderr")"; then
         status=0
     else
         status=$?
@@ -194,11 +198,182 @@ run_history --cache "$CACHE" --backfill || fail "the second backfill exited $?: 
 [[ "$(wc -l <"$LEDGER" | tr -d ' ')" -eq 1 ]] || fail "a repeated backfill duplicated the interval"
 ok "a repeated backfill is a no-op"
 
+# --- diff tree ---------------------------------------------------------------
+
+# Two snapshots with real bodies, so the extractor and the differ run offline.
+DIFFCACHE="$WORK/diffcache"
+STATE2="$WORK/state2"
+mkdir -p "$DIFFCACHE/2026-01-01" "$DIFFCACHE/2026-02-01" "$STATE2"
+
+make_page() { # DIR SLUG TITLE BODY
+    local dir="$1" slug="$2" title="$3" body="$4" file="$1/api-page-1.json"
+    if [[ -f "$file" ]]; then
+        jq --arg slug "$slug" --arg title "$title" --arg body "$body" \
+            '. + [{slug: $slug, title: {rendered: $title},
+                   content: {rendered: $body}, modified_gmt: "2026-01-01T00:00:00"}]' \
+            "$file" >"$file.tmp" && mv "$file.tmp" "$file"
+    else
+        jq -n --arg slug "$slug" --arg title "$title" --arg body "$body" \
+            '[{slug: $slug, title: {rendered: $title},
+               content: {rendered: $body}, modified_gmt: "2026-01-01T00:00:00"}]' \
+            >"$file"
+    fi
+}
+
+# 1800 short paragraphs (~80 KB), so the diff is larger than the 64 KB cap while
+# every argument stays under the 128 KB exec limit.
+huge_old="$WORK/huge-old.html"
+huge_new="$WORK/huge-new.html"
+{
+    printf '<p>Introduction line</p>\n'
+    seq 1 1800 | while IFS= read -r n; do printf '<p>Paragraph %s of the long article</p>\n' "$n"; done
+} >"$huge_old"
+# Every paragraph changes, so the diff itself — not just one line — is oversized.
+cp "$huge_old" "$huge_new"
+sed -i 's/of the long article/of the revised article/' "$huge_new"
+
+old_body='<p>Alpha one</p>'
+new_body='<p>Alpha two</p>'
+same_body='<p>Bravo stays</p>'
+make_page "$DIFFCACHE/2026-01-01" alpha "Alpha" "$old_body"
+make_page "$DIFFCACHE/2026-01-01" bravo "Bravo" "$same_body"
+make_page "$DIFFCACHE/2026-01-01" delta "Delta" '<p>Delta goes away</p>'
+make_page "$DIFFCACHE/2026-01-01" echo-title "Echo" '<p>Echo body</p>'
+make_page "$DIFFCACHE/2026-01-01" huge "Huge" "$(cat "$huge_old")"
+make_page "$DIFFCACHE/2026-02-01" alpha "Alpha" "$new_body"
+make_page "$DIFFCACHE/2026-02-01" bravo "Bravo" '<div class="wrapper"><p>Bravo stays</p></div>'
+make_page "$DIFFCACHE/2026-02-01" charlie "Charlie" '<p>Charlie is new</p>'
+make_page "$DIFFCACHE/2026-02-01" echo-title "Echo renamed" '<p>Echo body</p>'
+make_page "$DIFFCACHE/2026-02-01" huge "Huge" "$(cat "$huge_new")"
+
+# Manifests carry titles only (bodies come from the api pages above).
+make_manifest_from_pages() { # DIR FETCHED
+    jq --arg fetched "$2" '
+        {fetched_at: $fetched, count: length,
+         entries: [ .[] | {url: ("https://gridpane.com/kb/" + .slug + "/"),
+                            title: .title.rendered, sha256: "fixture"}]}' \
+        "$1/api-page-1.json" >"$1/manifest.json"
+}
+
+make_manifest_from_pages "$DIFFCACHE/2026-01-01" "2026-01-01T00:00:00Z"
+make_manifest_from_pages "$DIFFCACHE/2026-02-01" "2026-02-01T00:00:00Z"
+
+AFFECTED="$WORK/affected.json"
+jq -n '{rows: [
+    {status: "changed", url: "https://gridpane.com/kb/alpha",
+     file: "/tmp/skills/gridpane-core/references/sources.md", line: 12},
+    {status: "changed", url: "https://gridpane.com/kb/bravo", file: null, line: null},
+    {status: "added", url: "https://gridpane.com/kb/charlie", file: null, line: null},
+    {status: "removed", url: "https://gridpane.com/kb/delta", file: null, line: null},
+    {status: "title", url: "https://gridpane.com/kb/echo-title", file: null, line: null},
+    {status: "changed", url: "https://gridpane.com/kb/huge", file: null, line: null}]}' \
+    >"$AFFECTED"
+
+emit() {
+    "$HISTORY" --emit-diffs --affected "$AFFECTED" --date 2026-02-01 \
+        --snapshot "$DIFFCACHE/2026-02-01" --baseline-snapshot "$DIFFCACHE/2026-01-01" \
+        --state "$STATE2" 2>"$WORK/emit.err"
+}
+
+if ! emit >"$WORK/emit.tsv"; then
+    fail "the diff emission exited $?: $(cat "$WORK/emit.err")"
+fi
+DIFFS="$STATE2/diffs/2026-02-01"
+[[ -d "$DIFFS" ]] || fail "no diff directory was written"
+[[ "$(ls "$DIFFS" | wc -l | tr -d ' ')" -eq 6 ]] \
+    || fail "expected six diff files, found: $(ls "$DIFFS" | tr '\n' ' ')"
+grep -q '^@@' "$DIFFS/2026-02-01-alpha.md" || fail "a text change carries no hunk"
+grep -q 'markup only' "$DIFFS/2026-02-01-bravo.md" \
+    || fail "an identical body was not reported as markup-only"
+grep -q 'New article' "$DIFFS/2026-02-01-charlie.md" || fail "the added stub is missing"
+grep -q 'Charlie is new' "$DIFFS/2026-02-01-charlie.md" \
+    && fail "the added stub carries the article body"
+grep -q 'no longer appears' "$DIFFS/2026-02-01-delta.md" || fail "the removed note is missing"
+grep -q 'Echo renamed' "$DIFFS/2026-02-01-echo-title.md" || fail "the title change is missing"
+grep -q 'Derived by a workstation path' "$DIFFS/2026-02-01-alpha.md" \
+    && fail "a diff carries a workstation path"
+grep -q '/tmp/skills' "$DIFFS/2026-02-01-alpha.md" \
+    && fail "a diff carries an absolute citation path"
+grep -q 'Diff truncated at 64 KB' "$DIFFS/2026-02-01-huge.md" \
+    || fail "an oversized diff was not truncated"
+huge_bytes="$(wc -c <"$DIFFS/2026-02-01-huge.md" | tr -d ' ')"
+[[ "$huge_bytes" -lt 72000 ]] || fail "the truncated diff is $huge_bytes bytes"
+ok "the diff tree covers text, markup-only, added, removed, title-only and the cap"
+
+cp -R "$DIFFS" "$WORK/diffs-first"
+emit >/dev/null || fail "the second emission exited $?: $(cat "$WORK/emit.err")"
+if ! diff -r "$WORK/diffs-first" "$DIFFS" >/dev/null; then
+    fail "a second emission produced different bytes"
+fi
+ok "a rerun with the same snapshots produces identical bytes"
+
+# A record whose snapshots are gone renders without a link rather than inventing
+# one.
+LEDGER3="$WORK/ledger3.jsonl"
+OUT3="$WORK/history3.md"
+jq -c -n '{schema: 1, date: "2026-03-01", snapshot: "2099-01-01", baseline: "2099-01-01",
+    result: "backfilled", counts: {added: 0, removed: 0, changed: 1, title_only: 0,
+    references: 0, files: 0},
+    articles: [{status: "changed", url: "https://gridpane.com/kb/gone",
+                title: "Gone", citations: []}]}' >"$LEDGER3"
+"$HISTORY" --ledger "$LEDGER3" --out "$OUT3" --changes-dir "$WORK/changes3" \
+    --state "$STATE2" 2>/dev/null || fail "the gone-snapshot render exited $?"
+if grep -q '\[diff\](' "$OUT3"; then
+    fail "a record with no snapshots was linked to a diff"
+fi
+ok "a record with no retained snapshots renders without a link"
+
+# The tree renders, then --check agrees, then notices each kind of drift.
+LEDGER2="$WORK/ledger2.jsonl"
+OUT2="$WORK/render/KB-CHANGES.md"
+CHANGES2="$WORK/render/kb-changes"
+jq -c -n --argjson articles "$(jq -c '[.rows | group_by(.url) | .[] | .[0]
+    | {status, url, title: "", citations: []}]' "$AFFECTED")" '
+    {schema: 2, date: "2026-02-01", snapshot: "2026-02-01", baseline: "2026-01-01",
+     baseline_snapshot: "2026-01-01", diff_dir: "diffs/2026-02-01", result: "sent",
+     counts: {added: 1, removed: 1, changed: 3, title_only: 1, references: 0, files: 0},
+     articles: $articles}' >"$LEDGER2"
+
+render2() {
+    "$HISTORY" --ledger "$LEDGER2" --out "$OUT2" --changes-dir "$CHANGES2" \
+        --state "$STATE2" "$@" 2>"$WORK/render2.err"
+}
+
+render2 || fail "the tree render exited $?: $(cat "$WORK/render2.err")"
+[[ -f "$CHANGES2/README.md" ]] || fail "the tree has no README"
+[[ -f "$CHANGES2/2026/02/2026-02-01-alpha.md" ]] || fail "the tree is missing a diff"
+grep -q '\[diff\](kb-changes/2026/02/2026-02-01-alpha.md)' "$OUT2" \
+    || fail "the history does not link the diff: $(cat "$OUT2")"
+grep -q 'Cited by: `skills/gridpane-core/references/sources.md:12`' \
+    "$CHANGES2/2026/02/2026-02-01-alpha.md" \
+    || fail "the diff header lost its checkout-relative citation"
+render2 --check || fail "--check rejected a tree it had just written"
+ok "the tree renders with links and --check agrees"
+
+printf 'tampered\n' >>"$CHANGES2/2026/02/2026-02-01-alpha.md"
+if render2 --check; then fail "--check accepted an edited diff"; else [[ $? -eq 3 ]] || fail "--check exited $?"; fi
+printf 'stray\n' >"$CHANGES2/2026/02/2026-02-01-nosuch.md"
+if render2 --check; then fail "--check accepted an orphan"; else [[ $? -eq 3 ]] || fail "--check exited $?"; fi
+rm -f "$CHANGES2/2026/02/2026-02-01-alpha.md" "$CHANGES2/2026/02/2026-02-01-nosuch.md"
+if render2 --check; then fail "--check accepted a missing diff"; else [[ $? -eq 3 ]] || fail "--check exited $?"; fi
+ok "--check exits 3 for an edited, an orphaned and a missing file"
+
+render2 || fail "the recovery render exited $?: $(cat "$WORK/render2.err")"
+render2 --check || fail "--check did not recover after a re-render"
+ok "a re-render restores the tree and --check returns to 0"
+
 # --- shellcheck --------------------------------------------------------------
 
 if command -v shellcheck >/dev/null 2>&1; then
     shellcheck -x "$HISTORY" || fail "shellcheck reported a problem"
     ok "shellcheck passes"
+
+after_status="$(git -C "$REPO_ROOT" status --porcelain)"
+if [[ "$after_status" != "$before_status" ]]; then
+    fail "the suite changed the checkout: $(diff <(printf '%s\n' "$before_status") \
+        <(printf '%s\n' "$after_status"))"
+fi
+ok "the suite writes nothing into the checkout"
 else
     printf 'skip: shellcheck not installed\n'
 fi

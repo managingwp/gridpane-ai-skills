@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `kb-changes/`: one diff file per article per interval, linked from
+  `KB-CHANGES.md`. A changed article gets the hunks that moved, a hash-only change
+  says so, and a new article is a stub — no article body is ever committed. The
+  weekly job captures the diffs into its gitignored `state/diffs/<date>/` so a
+  snapshot prune cannot lose them, and `scripts/gridpane-kb-history.sh --check`
+  now compares the whole tree. `scrape-docs.sh --no-pandoc` keeps the extraction
+  byte-identical across machines.
 - `KB-CHANGES.md` plus `scripts/gridpane-kb-history.sh`: the weekly report now
   appends one record per completed comparison to a gitignored ledger, and this
   renderer turns it into a committed, human-readable history grouped by year and

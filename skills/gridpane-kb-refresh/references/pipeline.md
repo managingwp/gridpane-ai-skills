@@ -80,8 +80,11 @@ article changed" are different questions, answered by `check` and `diff`.
 
 `changed` means the `sha256` differs, and that hash is taken over the article's
 rendered HTML. Image attributes, wrapper markup or an editor re-render change the
-hash without changing a word — so `changed` is a candidate, not a verdict. Read
-the body before editing a citation.
+hash without changing a word — so `changed` is a candidate, not a verdict. The
+committed diff under `kb-changes/` settles it: a file that says "no text change"
+means the wording is identical, and a file with hunks is what you read before
+editing a citation. The diff is over extracted text, so open the article when a
+hunk is ambiguous.
 
 ## The counts
 

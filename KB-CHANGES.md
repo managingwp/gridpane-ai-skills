@@ -26,19 +26,19 @@ ledger; edit the ledger or the script, never this file by hand.
 **2026-11-09** · snapshot `2026-11-09` · baseline `2026-11-06` · backfilled
 0 added · 0 removed · 1 changed · 0 title-only
 Backfilled from the snapshot manifests; citations were not recorded.
-- changed — [PeakFreq Managed Hosting](https://gridpane.com/kb/peakfreq-managed-hosting)
+- changed — [PeakFreq Managed Hosting](https://gridpane.com/kb/peakfreq-managed-hosting) · [diff](kb-changes/2026/11/2026-11-09-peakfreq-managed-hosting.md)
 
 **2026-11-06** · snapshot `2026-11-06-4` · baseline `2026-10-21` · backfilled
 2 added · 0 removed · 9 changed · 0 title-only
 Backfilled from the snapshot manifests; citations were not recorded.
-- added — [Database Versions on Ubuntu 26.04: What Changes and Why](https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why)
-- added — [Migrating to Ubuntu 26.04: What You Need to Know](https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know)
-- changed — [Checks When Migrating/Cloning From One Server to Another](https://gridpane.com/kb/checks-for-migrating-cloning)
-- changed — [Clone Over an Existing Site](https://gridpane.com/kb/clone-over-an-existing-site)
-- changed — [Cloning One Entire Server to Another](https://gridpane.com/kb/cloning-one-entire-server-to-another)
-- changed — [Cloning a site to a new URL on a different server](https://gridpane.com/kb/cloning-a-duplicate-site-with-a-new-url-to-a-different-server)
-- changed — [Cloning a site with the same URL to a different server](https://gridpane.com/kb/cloning-a-duplicate-site-with-the-same-url-to-a-different-server)
-- changed — [Cloudflare Caching and GridPane](https://gridpane.com/kb/cloudflare-caching-and-gridpane)
-- changed — [How to add your own custom headers on OpenLiteSpeed (or reset existing headers)](https://gridpane.com/kb/how-to-add-your-own-custom-headers-on-openlitespeed)
-- changed — [Migrately – A CLI Tool for Full Server to Server Cloning](https://gridpane.com/kb/migrately)
-- changed — [Server Updates, Maintenance, & Security Patches – What Updates Does GridPane Take Care Of?](https://gridpane.com/kb/server-updates-what-does-gridpane-take-care-of)
+- added — [Database Versions on Ubuntu 26.04: What Changes and Why](https://gridpane.com/kb/database-versions-on-ubuntu-26-04-what-changes-and-why) · [diff](kb-changes/2026/11/2026-11-06-database-versions-on-ubuntu-26-04-what-changes-and-why.md)
+- added — [Migrating to Ubuntu 26.04: What You Need to Know](https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know) · [diff](kb-changes/2026/11/2026-11-06-migrating-to-ubuntu-26-04-what-you-need-to-know.md)
+- changed — [Checks When Migrating/Cloning From One Server to Another](https://gridpane.com/kb/checks-for-migrating-cloning) · [diff](kb-changes/2026/11/2026-11-06-checks-for-migrating-cloning.md)
+- changed — [Clone Over an Existing Site](https://gridpane.com/kb/clone-over-an-existing-site) · [diff](kb-changes/2026/11/2026-11-06-clone-over-an-existing-site.md)
+- changed — [Cloning One Entire Server to Another](https://gridpane.com/kb/cloning-one-entire-server-to-another) · [diff](kb-changes/2026/11/2026-11-06-cloning-one-entire-server-to-another.md)
+- changed — [Cloning a site to a new URL on a different server](https://gridpane.com/kb/cloning-a-duplicate-site-with-a-new-url-to-a-different-server) · [diff](kb-changes/2026/11/2026-11-06-cloning-a-duplicate-site-with-a-new-url-to-a-different-server.md)
+- changed — [Cloning a site with the same URL to a different server](https://gridpane.com/kb/cloning-a-duplicate-site-with-the-same-url-to-a-different-server) · [diff](kb-changes/2026/11/2026-11-06-cloning-a-duplicate-site-with-the-same-url-to-a-different-server.md)
+- changed — [Cloudflare Caching and GridPane](https://gridpane.com/kb/cloudflare-caching-and-gridpane) · [diff](kb-changes/2026/11/2026-11-06-cloudflare-caching-and-gridpane.md)
+- changed — [How to add your own custom headers on OpenLiteSpeed (or reset existing headers)](https://gridpane.com/kb/how-to-add-your-own-custom-headers-on-openlitespeed) · [diff](kb-changes/2026/11/2026-11-06-how-to-add-your-own-custom-headers-on-openlitespeed.md)
+- changed — [Migrately – A CLI Tool for Full Server to Server Cloning](https://gridpane.com/kb/migrately) · [diff](kb-changes/2026/11/2026-11-06-migrately.md)
+- changed — [Server Updates, Maintenance, & Security Patches – What Updates Does GridPane Take Care Of?](https://gridpane.com/kb/server-updates-what-does-gridpane-take-care-of) · [diff](kb-changes/2026/11/2026-11-06-server-updates-what-does-gridpane-take-care-of.md)
