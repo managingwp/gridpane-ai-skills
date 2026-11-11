@@ -3,7 +3,7 @@
 - Status: added
 - Interval: 2026-10-21 → 2026-11-06
 - Article: https://gridpane.com/kb/migrating-to-ubuntu-26-04-what-you-need-to-know
-- Cited by: nothing in `skills/`
+- Cited by: not recorded for this backfilled interval
 - Extracted text, not the published HTML: code blocks and tables may reflow.
 
 ## New article

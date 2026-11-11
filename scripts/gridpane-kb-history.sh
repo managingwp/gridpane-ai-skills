@@ -359,6 +359,8 @@ diff_header() {
     printf -- '- Article: %s\n' "$url"
     if [[ -n "$cites" ]]; then
         printf -- '- Cited by: %s\n' "$cites"
+    elif [[ "${CITES_UNRECORDED:-0}" -eq 1 ]]; then
+        printf -- '- Cited by: not recorded for this backfilled interval\n'
     else
         # shellcheck disable=SC2016  # literal Markdown backticks, not a command
         printf -- '- Cited by: nothing in `skills/`\n'
@@ -644,6 +646,12 @@ emit_record_diffs() {
                           file: .f, line: (.l | tonumber)})
                   end ]}' >"$affected" || return 1
 
+    # A backfilled interval never recorded citations; say so rather than
+    # claiming the article is uncited.
+    CITES_UNRECORDED=0
+    if [[ "$(jq -r '.result // ""' <<<"$record")" == "backfilled" ]]; then
+        CITES_UNRECORDED=1
+    fi
     emit_diffs "$affected" "$date" "$snap_dir" "$base_dir" "$out_state" \
         >/dev/null 2>&1
 }

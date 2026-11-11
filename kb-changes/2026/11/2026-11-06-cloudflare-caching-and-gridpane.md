@@ -3,7 +3,7 @@
 - Status: changed
 - Interval: 2026-10-21 → 2026-11-06
 - Article: https://gridpane.com/kb/cloudflare-caching-and-gridpane
-- Cited by: nothing in `skills/`
+- Cited by: not recorded for this backfilled interval
 - Extracted text, not the published HTML: code blocks and tables may reflow.
 
 ## No text change
