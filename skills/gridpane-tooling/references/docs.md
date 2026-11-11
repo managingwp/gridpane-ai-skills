@@ -116,6 +116,11 @@ inline CSS out of the text. Output is `<snapshot>/<slug>.md` (for example
 `out/gridpane-docs-cache/2026-10-21/cache-warming-gridpane-sitemap-driven-crawler.md`)
 — never commit it as an article body.
 
+`--no-pandoc` forces the built-in converter even when pandoc is installed. Use
+it whenever the output must be reproducible across machines — `kb-changes/`
+diffs are generated that way, so the same snapshot pair yields the same bytes
+whether or not the host has pandoc.
+
 The one exception is `kb-changes/`: `scripts/gridpane-kb-history.sh` diffs the
 text of two snapshots and commits only the hunks that moved, one file per
 article per interval. A new article is recorded as a stub with its size, never

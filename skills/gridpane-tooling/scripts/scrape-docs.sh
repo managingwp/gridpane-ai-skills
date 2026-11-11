@@ -61,6 +61,8 @@
 #   --partial            Accept an X-WP-Total mismatch (deliberate partial data)
 #   --offline            Do not fetch; read pages from the cache only
 #   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
+#   --no-pandoc          Always use the built-in text converter, even when
+#                        pandoc is installed (reproducible output)
 #   -h, --help           Show this help and exit
 #
 # Snapshots: every live run writes to <cache>/<YYYY-MM-DD>[-N]/ (never into an
@@ -84,6 +86,7 @@ LIMIT=0
 DELAY=10
 OFFLINE=0
 CONVERT=1
+NO_PANDOC=0
 SEARCH=""
 JSON_OUT=0
 SLUG=""
@@ -142,6 +145,8 @@ Options:
   --partial            Accept an X-WP-Total mismatch (deliberate partial data)
   --offline            Do not fetch; read pages from the cache only
   --no-convert         Skip HTML -> Markdown conversion (sitemap source)
+  --no-pandoc          Always use the built-in text converter, even when pandoc
+                       is installed, so extraction is byte-identical on any host
   -h, --help           Show this help and exit
 
 Manifest shape: {source, fetched_at, count, entries:[…]}; a --since run also
@@ -545,7 +550,7 @@ extract_one() {
         return 1
     fi
 
-    if [[ "$FORMAT" == "markdown" ]] && have pandoc; then
+    if [[ "$FORMAT" == "markdown" ]] && [[ "$NO_PANDOC" -eq 0 ]] && have pandoc; then
         body="$(printf '%s' "$body" | pandoc -f html -t gfm 2>/dev/null)" || body=""
         converter="pandoc"
         if [[ -z "$body" ]]; then
@@ -618,6 +623,7 @@ while [[ $# -gt 0 ]]; do
         --delay)       DELAY="${2:?--delay needs a value}"; shift 2 ;;
         --offline)     OFFLINE=1; shift ;;
         --no-convert)  CONVERT=0; shift ;;
+        --no-pandoc)   NO_PANDOC=1; shift ;;
         -h|--help)     usage; exit 0 ;;
         *) log "error: unknown option: $1"; usage >&2; exit 2 ;;
     esac
